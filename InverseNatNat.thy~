@@ -1,9 +1,5 @@
 theory InverseNatNat imports Main HOL.Filter begin
 
-\<comment> \<open>This theory, including the structure of many proofs and the comments 
-   follow closely the Coq library accompanying the paper by Charguéraud and Pottier:
-   \<^url>\<open>http://gallium.inria.fr/~fpottier/dev/uf/\<close>\<close>
-
 locale f_nat_nat =
   fixes f :: "nat\<Rightarrow>nat"
   assumes strict_mono_f: "strict_mono f"
@@ -35,18 +31,17 @@ lemma betaf_bound: "\<exists>x.\<forall>y\<^sub>0. f y\<^sub>0 \<le> y \<longrig
 
 
 (* -------------------------------------------------------------------------- *)
-\<comment>\<open> Because @{term f} tends towards infinity, for every y, there exists a least
-   @{term x} such that @{term "f x"} is at least @{term y}. 
-   We refer to it as @{term "\<alpha>\<^sub>f y"}. \<close>
+(* Because f tends towards infinity, for every y, there exists a least
+   x such that f x is at least y. We refer to it as \<alpha>\<^sub>f y. *)
 (* -------------------------------------------------------------------------- *)
 
 
 definition \<alpha>\<^sub>f where "\<alpha>\<^sub>f y \<equiv> Least (\<lambda>x. y \<le> f x)"
 
-\<comment> \<open>By definition, @{term "\<alpha>\<^sub>f y"} is the least x such that @{term "y \<le> f x"} holds.
-   Because @{term f} is monotonic, this property holds for all @{term x} above @{term "\<alpha>\<^sub>f y"}.
-   Thus, @{term "y \<le> f x"} is equivalent to @{term "\<alpha>\<^sub>f y \<le> x"}. In that sense, @{term \<alpha>\<^sub>f}
-   is an inverse of @{term f}. \<close>
+(* By definition, "\<alpha>\<^sub>f y" is the least x such that "y \<le> f x holds.
+   Because f is monotonic, this property holds for all x above "\<alpha>\<^sub>f y".
+   Thus, "y \<le> f x" is equivalent to "\<alpha>\<^sub>f y \<le> x". In that sense, \<alpha>\<^sub>f
+   is an inverse of f. *)
 
 lemma \<alpha>\<^sub>f_spec_direct: assumes "\<alpha>\<^sub>f y \<le> x" shows "y \<le> f x"
 proof -
@@ -90,12 +85,11 @@ lemma \<alpha>\<^sub>f_mono: "mono \<alpha>\<^sub>f"
   by blast
 
 (* -------------------------------------------------------------------------- *)
-\<comment> \<open> Almost symmetrically, if @{term "f 0 \<le> y"} holds, then there exists a largest 
-     @{term x} such that @{term "f x"} is bounded by @{term y}.
-     We refer to it as @{term "\<beta>\<^sub>f y"}. Because @{term f} is monotonic,
-     this property holds for all @{term x}  below @{term "\<beta>\<^sub>f y"}. Thus,
-   @{term "f x \<le> y"} is equivalent to @{term "x \<le> \<beta>\<^sub>f y"}.
-     In that sense, @{term \<beta>\<^sub>f} is an inverse of @{term f}.\<close>
+(* Almost symmetrically, if "f 0 \<le> y" holds, then there exists a largest x
+   such that "f x" is bounded by y. We refer to it as "\<beta>\<^sub>f y". Because
+   f is monotonic, this property holds for all x below "\<beta>\<^sub>f y". Thus,
+   "f x \<le> y" is equivalent to "x \<le> \<beta>\<^sub>f y". In that sense, \<beta>\<^sub>f is an
+   inverse of f. *)
 (* -------------------------------------------------------------------------- *)
 
 definition \<beta>\<^sub>f where "\<beta>\<^sub>f y = Greatest (\<lambda>x. f x \<le> y)"
@@ -153,20 +147,21 @@ lemma \<beta>\<^sub>f_mono: "\<forall>x y. (f 0 \<le> x \<and> x \<le> y) \<long
 section{* Relationship between \<alpha>_f and \<beta>_f *}
 (* -------------------------------------------------------------------------- *)
 
-\<comment>\<open> Because @{term f} is strictly monotonic, for a fixed @{term y}, there is at most one
-   point @{term x} where @{term "f x = y"} holds. This implies that, if @{term "\<beta>\<^sub>f y"} is
-   defined, then @{term "\<beta>\<^sub>f y"} is less than or equal to @{term "\<alpha>\<^sub>f y"}. \<close>
+(* Because f is strictly monotonic, for a fixed y, there is at most one
+   point x where "f x = y" holds. This implies that, if "\<beta>\<^sub>f y" is
+   defined, then "\<beta>\<^sub>f y" is less than or equal to "\<alpha>\<^sub>f y". *)
 
 lemma \<beta>\<^sub>f_le_\<alpha>\<^sub>f: assumes "f 0 \<le> y" shows "\<beta>\<^sub>f y \<le> \<alpha>\<^sub>f y"
   using mono_f strict_mono_f assms
   by (metis \<alpha>\<^sub>f_spec_direct \<beta>\<^sub>f_spec_direct dual_order.antisym le_cases strict_mono_eq)
 
 lemma \<beta>\<^sub>f_le_\<alpha>\<^sub>f_equality: assumes "f x = y" shows "\<alpha>\<^sub>f y = x" "\<beta>\<^sub>f y = \<alpha>\<^sub>f y" 
+  using assms 
 proof -
   have 1: "\<alpha>\<^sub>f y = x" using \<alpha>\<^sub>f_f_exact assms by auto
   have 2: "\<beta>\<^sub>f y = x" using \<beta>\<^sub>f_f_exact assms by auto
-  show "\<alpha>\<^sub>f y = x" using 1 2 by fast
-  show "\<beta>\<^sub>f y = \<alpha>\<^sub>f y" using 1 2 by presburger
+  show "f x = y \<Longrightarrow> \<alpha>\<^sub>f y = x" using 1 2 by fast
+  show "f x = y \<Longrightarrow> \<beta>\<^sub>f y = \<alpha>\<^sub>f y" using 1 2 by presburger
 qed
 
 lemma \<beta>\<^sub>f_le_\<alpha>\<^sub>f_equality_converse: assumes "f 0 \<le> y" "\<beta>\<^sub>f y = \<alpha>\<^sub>f y" "\<alpha>\<^sub>f y = x" shows "f x = y"

@@ -1,10 +1,5 @@
 theory Ackermann imports Main "~~/src/HOL/ex/Primrec"  "~~/src/HOL/Library/Discrete" InverseNatNat begin
 
-\<comment> \<open>This theory, including the structure of many proofs and the comments 
-   follow closely the Coq library accompanying the paper by Charguéraud and Pottier:
-   \<^url>\<open>http://gallium.inria.fr/~fpottier/dev/uf/\<close>\<close>
-
-
 (*Tarjan's definition, formulated in terms of compower*)
 definition Ackermann where 
   "Ackermann k \<equiv> ((\<lambda>f x. (f ^^ Suc x) x) ^^ k) Suc"
@@ -41,7 +36,7 @@ lemma Ackermann_step_eq: "Ackermann (Suc k) x = compow (Suc x) (Ackermann k) x"
 
 
 (********************************************)
-subsection{*Closed forms for @{term "Ackermann 1"} and @{term "Ackermann 2"}, from Cormen et al.*}
+subsection{*Closed forms for Ackermann 1 and Ackermann 2, from Cormen et al.*}
 (********************************************)
 
 
@@ -60,17 +55,16 @@ lemma Ackermann_1_eq': "Ackermann 1 x = Suc (2 * x)"
   by (simp add: Ackermann_1_eq)
 
 
-lemma compow_Ackermann_1_eq_lemma: assumes "i>0" "x>0" 
-  shows "Suc (2 * (2 ^ i * Suc x - 1)) = 2 ^ Suc i * Suc x - 1"
+lemma compow_Ackermann_1_eq_lemma: assumes "i>0" "x>0" shows "Suc (2 * (2 ^ i * Suc x - 1)) = 2 ^ Suc i * Suc x - 1"
 proof -
   {
     have sg1: "2 ^ Suc i * Suc x > 1"
       using assms
-      by (metis One_nat_def Suc_mono less_1_mult one_less_numeral_iff power_gt1 less_num_simps(2))
+      by (metis One_nat_def Suc_mono less_1_mult one_less_numeral_iff power_gt1 semiring_norm(76))
   } note sg1 = this
   show ?thesis
   apply (subst Suc_eq_plus1)
-  apply (subst diff_mult_distrib2) 
+  apply (subst diff_mult_distrib2)
   apply (subst mult_1_right)
   apply (subst semigroup_mult_class.mult.assoc[symmetric])
   apply (subst power_class.power.power_Suc[symmetric])
@@ -95,25 +89,32 @@ next
      subgoal
        apply (cases "x>0")
        subgoal  using compow_Ackermann_1_eq_lemma[of i x] .
-       subgoal 
-         by (metis One_nat_def Suc_1 Suc_diff_Suc lessI mult.right_neutral
-             not_gr_zero power_Suc power_gt1 right_diff_distrib')
+       subgoal apply auto
+         apply (subst Suc_eq_plus1)
+         apply (subst diff_mult_distrib2)
+         apply auto
+         by (metis One_nat_def Suc_1 Suc_diff_Suc one_less_numeral_iff power_gt1_lemma semiring_norm(76))
        done
-     apply (cases "x>0")
+     apply (cases "x > 0")
      by auto
 qed
 
 lemma Ackermann_2_eq: "Ackermann 2 x = 2^(Suc x) * (Suc x) - 1"
-  apply (subst numeral_2_eq_2; subst One_nat_def[symmetric])
-  apply (subst Ackermann_step_eq)
-  apply (subst compow_Ackermann_1_eq) ..
+proof -
+  {have "2 = (Suc 1)" by simp} note sg1=this
+  show ?thesis
+    apply (subst sg1)
+    apply (subst Ackermann_step_eq)
+    apply (subst compow_Ackermann_1_eq)
+    by blast
+qed
   
 (********************************************)
-subsection {*Every @{term "Ackermann k"} is inflationary. 
-             That is, @{term "x \<le> Ackermann k x"} holds.*}
+subsection {*Every Ackermann k is inflationary. That is, x \<le> Ackermann k x holds.*}
 (********************************************)
 
 abbreviation inflationary where "inflationary f \<equiv> \<forall>x. x \<le> f x"
+(*There is probably an Isabelle thing for this, didn't find it*)
 
 lemma inflationary_concrete: "inflationary f \<Longrightarrow> x \<le> f x"
   by simp
@@ -179,7 +180,7 @@ lemma compow_Ackermann_k_inflationary': "x\<le> ((Ackermann k)^^n) x"
   
   
 (********************************************)
-subsection {*@{term astep} is @{term inflationary}.*}
+subsection {*astep is inflationary. That is, for inflationary f, f x \<le> astep f x holds*}
 (********************************************)
 
 lemma inflationary_astep: assumes "inflationary f" shows "f x \<le> astep f x"
@@ -196,8 +197,8 @@ qed
 
 
 (********************************************)
-subsection {*@{term Ackermann} is monotonic in its first argument. 
-            The results, which are functions, are compared pointwise*}
+subsection {*Ackermann is monotonic in its first argument. The results, which are functions, 
+            are compared pointwise*}
 (********************************************)
 
 
@@ -252,7 +253,7 @@ lemma mono_Ackermann_in_k: "mono (\<lambda>k. Ackermann k x)"
 
 
 (********************************************)
-subsection {*Power can be expressed with @{term compow}*}
+subsection {*Power can be expressed with compow*}
 (********************************************)
 
 lemma funpow_Suc_right_apply: "(f ^^ Suc n) x = (f ^^ n) (f x)" 
@@ -262,7 +263,7 @@ lemma funpow_Suc_right_apply: "(f ^^ Suc n) x = (f ^^ n) (f x)"
 lemma pow_compow: " x ^ y = compow y (\<lambda>a. x * a ) 1" \<comment>\<open>(( * ) x ^^ y) 1\<close>
   by (induction y) auto
 
-\<comment>\<open> Lower bound for @{term "Ackermann 2"}: @{term "2^x \<le> Ackermann 2 x"} \<close>
+(* 2 ^ x \<le> Ackermann 2 x *)
 
 lemma Ackermann_2_lower_bound': assumes "x>0" shows "2 ^ x < Ackermann 2 x"
 proof -
@@ -305,7 +306,7 @@ lemma Ackermann_2_lower_bound: "2 ^ x \<le> Ackermann 2 x"
 
 (********************************************)
 subsection {*A slightly more powerful version of the previous lemma. It is not a
-   direct consequence of the previous lemma, because @{term "2 ^ (Discrete.log n)"} is
+   direct consequence of the previous lemma, because 2 ^ (log n) is
    in general less than or equal to n*}
 (********************************************)
 
@@ -368,13 +369,11 @@ proof -
     by presburger
 qed
 
-\<comment>\<open>This is a version of @{term funpow_mono2} for comparing two functions on the same i\<close>
 lemma compow_mono_in_f: assumes "mono (f::nat\<Rightarrow>nat)" "mono (g::nat\<Rightarrow>nat)" "\<forall>x. f x \<le> g x"
   shows "(f ^^ i) x \<le> (g ^^ i) x"
   using compow_mono_in_f_2 assms by blast
 
-\<comment>\<open>This is a version of @{term funpow_mono2} for comparing two functions instead of only
-  the number of iterations\<close>
+
 lemma compow_mono_in_f_and_i': assumes "mono (f::nat\<Rightarrow>nat)" "mono (g::nat\<Rightarrow>nat)" "inflationary g"
   "\<forall> x y. x\<le> y \<longrightarrow> f x \<le> g y" "x\<le>y" "i\<le>j"
   shows "(f ^^ i) x \<le> (g ^^ j) y"
@@ -385,15 +384,13 @@ proof goal_cases
   also have "(g ^^ i) y \<le> (g ^^ j) y"  using assms funpow_mono2 by blast
   finally show ?case .
 qed
-thm funpow_mono2 compow_mono_in_f
-
+  
 lemma Ackermann_3_lower_bound:  "compow (Suc x) ((^) 2) 0 \<le> Ackermann 3 x"
 proof -
   have def_3:"3 = Suc 2" by simp
   have monopow: "mono ((^) (2::nat))" unfolding mono_def by simp
   have sg1: "\<forall>x. 2 ^ x \<le> Ackermann 2 x" using Ackermann_2_lower_bound by blast
-  have sg2: "\<forall> x y. x\<le> y \<longrightarrow> Ackermann 2 x \<le> Ackermann 2 y" 
-    using mono_Ackermann[of 2] unfolding mono_def .
+  have sg2: "\<forall> x y. x\<le> y \<longrightarrow> Ackermann 2 x \<le> Ackermann 2 y" using mono_Ackermann[of 2] unfolding mono_def .
   have sg3: "\<forall> x y. x\<le> y \<longrightarrow>  2 ^ x \<le> Ackermann 2 y" using sg1 sg2 order_trans by blast
   show ?thesis
     apply (subst def_3)
@@ -404,7 +401,7 @@ proof -
 qed
 
 (********************************************)
-subsection {*Every @{term "Ackermann k"} tends to infinity*}
+subsection {*Some stuff about asymptotics*}
 (********************************************)
 
 lemma Ackermann_k_tends_to_infinity:
@@ -417,8 +414,7 @@ lemma Ackermann_k_tends_to_infinity:
 
 
 (********************************************)
-subsection {*Every @{term "Ackermann k"} is strictly inflationary. 
-             That is, @{term "x < Ackermann k x"} holds.*}
+subsection {*Every Ackermann k is strictly inflationary. That is, x < Ackermann k x holds.*}
 (********************************************)
 
 lemma Ackermann_k_strictly_inflationary:
@@ -430,8 +426,7 @@ proof -
 qed
 
 (********************************************)
-subsection {*For every n other than zero, 
-             @{term "compow n (Ackermann k)"} is strictly inflationary.*}
+subsection {*For every n other than zero, compow n (Ackermann k) is strictly inflationary.*}
 (********************************************)
 
 lemma compow_Ackermann_k_strictly_inflationary':
@@ -452,7 +447,7 @@ proof -
 qed
 
 (********************************************)
-subsection {*The function  @{term "\<lambda>k. Ackermann k x"} is @{term strict_mono}.*}
+subsection {*The function  \<lambda>k. Ackermann k x is strictly monotonic in k.*}
 (********************************************)
 
 lemma Ackermann_strict_mono_in_k_step:
@@ -477,7 +472,7 @@ proof goal_cases
 qed
 
 (********************************************)
-subsection {*Orbits of inflationary functions*}
+subsection {*Some stuff about orbits of inflationary functions*}
 (********************************************)
 
 lemma Ackermann_k_x_tends_to_infinity_along_k:
@@ -495,9 +490,14 @@ proof -
     fix i
     have "x + i \<le> compow i f x" using assms proof (induction i)
       case (Suc i)
-      have "Suc (x + i) \<le> f ((f ^^ i) x)"
-        using assms Suc(1)[OF \<open> \<forall>x. x < f x\<close>] Suc_leI le_less_trans by blast
-      then show ?case by (simp add: funpow_swap1 funpow_Suc_right_apply)
+      then show ?case 
+        apply (subst funpow_Suc_right_apply)
+        apply auto proof goal_cases
+        case 1
+        have "Suc (x + i) \<le> f ((f ^^ i) x)" using assms Suc(1)[OF \<open> \<forall>x. x < f x\<close>]
+          using Suc_leI le_less_trans by blast
+        then show ?case by (simp add: funpow_swap1)
+      qed
     qed simp
   } note bound = this
   thus ?thesis 
@@ -539,18 +539,20 @@ proof goal_cases
 qed
 
 (********************************************)
-subsection {* @{term "(\<lambda> i. compow i (Ackermann k) x)"} is monotonic.*}
+subsection {* (\<lambda> i. compow i (Ackermann k) x) is monotonic.*}
 (********************************************)
 
 lemma compow_Ackermann_mono_in_i:
   "mono (\<lambda> i. (Ackermann k ^^ i) x)"
   unfolding mono_def
-  apply safe
+  apply auto
 proof goal_cases
   case (1 i j)
   show ?case using 
       funpow_mono2[OF mono_Ackermann[of k] \<open>i\<le>j\<close>, of x x] Ackermann_k_inflationary[of k] by blast
 qed
+
+
 
 
 (********************************************)
@@ -563,17 +565,16 @@ definition \<alpha> where
 
 interpretation A1nn: f_nat_nat "\<lambda>k. Ackermann k 1"
   apply standard subgoal using Ackermann_strict_mono_in_k[of 1] by simp
-  subgoal using Ackermann_k_x_tends_to_infinity_along_k[of 1] by simp
-  done
+  using Ackermann_k_x_tends_to_infinity_along_k[of 1] by simp
 
-abbreviation \<alpha>' where
+definition \<alpha>' where
   "\<alpha>' \<equiv> A1nn.\<alpha>\<^sub>f "
 
-lemma \<alpha>_alt_eq: "\<alpha> = \<alpha>'" unfolding \<alpha>_def A1nn.\<alpha>\<^sub>f_def by blast
+lemma \<alpha>_alt_eq: "\<alpha> = \<alpha>'" unfolding \<alpha>_def \<alpha>'_def A1nn.\<alpha>\<^sub>f_def by blast
 
 
 lemma mono_\<alpha>: "mono \<alpha>"
-  apply (subst \<alpha>_alt_eq)
+  apply (subst \<alpha>_alt_eq) unfolding \<alpha>'_def
   using A1nn.\<alpha>\<^sub>f_mono .
 
 
@@ -596,13 +597,13 @@ proof -
   thus ?thesis by blast
 qed
 
-(********************************************)
-subsection{* @{term \<alpha>} grows very slowly. In particular, of course, it never grows by more
-             than one at a time.*}
-(********************************************)
+(* -------------------------------------------------------------------------- *)
 
-\<comment>\<open>We state this lemma directly in a generalized form that will be useful when
-   we later consider the function @{term alphar} introduced by Alstrup et al. \<close>
+(* \<alpha> grows very slowly. In particular, of course, it never grows by more
+   than one at a time. *)
+
+(* We state this lemma directly in a generalized form that will be useful when
+   we later consider the function alphar introduced by Alstrup et al. *)
 
 lemma \<alpha>_grows_one_by_one: "Apnn.\<alpha>\<^sub>f (Suc n) \<le> Suc (Apnn.\<alpha>\<^sub>f n)"
   apply (subst Apnn.\<alpha>\<^sub>f_spec)
@@ -629,31 +630,32 @@ end
 
 lemma "\<alpha> (Suc n) \<le> Suc (\<alpha> n)" 
   apply (subst \<alpha>_alt_eq)+
-  using \<alpha>_grows_one_by_one[OF zero_less_one] .
+  using \<alpha>_grows_one_by_one[OF zero_less_one]
+  unfolding \<alpha>'_def .
 
-(********************************************)
-subsection{* As soon as @{term n} is at least 4, @{term "\<alpha> n"} is greater than one. *}
-(********************************************)
+(* -------------------------------------------------------------------------- *)
+
+(* As soon as n is at least 4, "\<alpha> n" is greater than one. *)
 
 lemma two_le_\<alpha>: assumes "4 \<le> n" shows "2 \<le> \<alpha> n"
-  apply (subst \<alpha>_alt_eq) 
+  apply (subst \<alpha>_alt_eq) unfolding \<alpha>'_def 
 proof -
   have fact: "Ackermann 1 1 < n" apply (subst Ackermann_1_eq') using assms by fastforce
   show "2 \<le> A1nn.\<alpha>\<^sub>f n"  using A1nn.\<alpha>\<^sub>f_spec_direct_contrapositive[OF fact] by simp
 qed
   
-(********************************************)
-\<comment>\<open> @{term "\<alpha> n"} is at most @{term "Suc (\<alpha> (Discrete.log n))"}. This gives a weak sense of how
-   slowly the function @{term \<alpha>} grows. In fact, the function log* would
-   satisfy the same property; yet @{term \<alpha>} grows even more slowly than
-   log*.
+(* -------------------------------------------------------------------------- *)
 
-   This property also shows that @{term "\<alpha> n"} and @{term "\<alpha> (Discrete.log n)"} are
+(* "\<alpha> n" is at most "Suc (alpha (log n))". This gives a weak sense of how
+   slowly the function \<alpha> grows. In fact, the function log* would
+   satisfy the same property; yet \<alpha> grows even more slowly than
+   log*. *)
+
+(* This property also shows that "\<alpha> n" and "\<alpha> (log n)" are
    asymptotically equivalent. This explains why Tarjan and Cormen et al. are
-   content with a bound of @{term "\<alpha> n"} for the amortized complexity of union and
-   find, even though they could easily obtain @{term "\<alpha> (Discrete.log n)"}. See Exercise
-   21.4-6 in Cormen et al. \<close>
-(********************************************)
+   content with a bound of "\<alpha> n" for the amortized complexity of union and
+   find, even though they could easily obtain "\<alpha> (log n)". See Exercise
+   21.4-6 in Cormen et al. *)
 
 lemma "n \<le> Ackermann (A1nn.\<alpha>\<^sub>f (Discrete.log n)) (Discrete.log n)"
   oops
@@ -662,43 +664,44 @@ lemma prove_le_log: assumes "2 ^ k \<le> n" shows "k \<le> Discrete.log n" using
 
 lemma \<alpha>_n_0_\<alpha>_logn:
   assumes "16 \<le> n" shows "\<alpha> n \<le> Suc (\<alpha> (Discrete.log n))"
-  apply (subst \<alpha>_alt_eq)
+  apply (subst \<alpha>_alt_eq) unfolding \<alpha>'_def
   apply (rule A1nn.\<alpha>\<^sub>f_spec_reciprocal)
   apply (subst Ackermann_step_eq)
-  apply simp
+  apply simp 
   apply (subst One_nat_def[symmetric])
-  apply (subst \<alpha>_alt_eq)+
+  apply (subst \<alpha>_alt_eq)+ unfolding \<alpha>'_def
   apply (cases "(A1nn.\<alpha>\<^sub>f (Discrete.log n)) \<ge> 2" )
+  subgoal using two_le_\<alpha> apply (subst (asm) \<alpha>_alt_eq) unfolding \<alpha>'_def
   proof goal_cases
-    let ?log = "Discrete.log"
     case 1
-    have "n \<le> Ackermann 2 (?log n)" using Ackermann_2_log_lower_bound[of n] .
-    also have "\<dots> \<le> Ackermann 2 (Ackermann (A1nn.\<alpha>\<^sub>f (?log n)) 1)" 
-      using A1nn.f_\<alpha>\<^sub>f[of "?log n"] mono_Ackermann unfolding mono_def by blast
-    also have "\<dots> \<le> Ackermann (A1nn.\<alpha>\<^sub>f (?log n)) (Ackermann (A1nn.\<alpha>\<^sub>f (?log n)) 1)"
-      using 1(1) mono_Ackermann_in_k[of "(Ackermann (A1nn.\<alpha>\<^sub>f (?log n)) 1)"] two_le_\<alpha> 
-      unfolding mono_def  
-      by (simp add: \<alpha>_alt_eq)  
-    finally show ?case .
-  next
-    case 2
-    have 3: "4 \<le> Discrete.log n " using assms by (simp add: prove_le_log)
-    have "2 \<le> A1nn.\<alpha>\<^sub>f (Discrete.log n)" using two_le_\<alpha>[OF 3] 
-      by (subst (asm) \<alpha>_alt_eq)
-    then show ?case using 2 by blast
+    have "n \<le> Ackermann 2 (Discrete.log n)" using Ackermann_2_log_lower_bound[of n] .
+    also have "\<dots> \<le> Ackermann 2 (Ackermann (A1nn.\<alpha>\<^sub>f (Discrete.log n)) 1)" 
+      using A1nn.f_\<alpha>\<^sub>f[of "Discrete.log n"] mono_Ackermann unfolding mono_def by blast
+      also have "\<dots> \<le> Ackermann (A1nn.\<alpha>\<^sub>f (Discrete.log n))
+          (Ackermann (A1nn.\<alpha>\<^sub>f (Discrete.log n)) 1)" using 1(1) 
+          mono_Ackermann_in_k[of "(Ackermann (A1nn.\<alpha>\<^sub>f (Discrete.log n)) 1)"] 
+        unfolding mono_def by blast
+      finally show ?case .
   qed
+  subgoal  proof goal_cases
+    case 1
+    have 2: "4 \<le> Discrete.log n " using assms by (simp add: prove_le_log)
+    have "2 \<le> A1nn.\<alpha>\<^sub>f (Discrete.log n)" using two_le_\<alpha>[OF 2] 
+      apply (subst (asm) \<alpha>_alt_eq) unfolding \<alpha>'_def .
+    then show ?case using 1 by blast
+  qed
+  done
 
 
 
-(********************************************)
+
+(* -------------------------------------------------------------------------- *)
 subsection {*alphar*}
 
-\<comment>\<open> Alstrup et al. define the function @{term alphar} as follows (page 17).
-   Note that their definition of @{term Ackermann} is not the same as ours -- they
+(* Alstrup et al. define the function alphar as follows (page 17).
+   Note that their definition of Ackermann is not the same as ours -- they
    index k from 1 and up, whereas, following Tarjan, we index k
-   from 0 and up -- so our definition of alphar looks different. \<close>
-(********************************************)
-
+   from 0 and up -- so our definition of alphar looks different. *)
 context 
   fixes r::nat
   assumes pos: "r>0"
@@ -720,42 +723,33 @@ definition alphar' where "alphar' n \<equiv> Suc (prealphar n)"
 lemma alphar_alt_eq: "alphar = alphar'"
   unfolding alphar_def alphar'_def prealphar_def pnn.\<alpha>\<^sub>f_def by blast
 
-subsubsection{* @{term "alphar n"} is positive.*}
+(* "alphar n" is positive. *)
 
 lemma alphar_pos: "0 < alphar n"
   unfolding alphar_def by simp
 
-(********************************************)
-subsubsection{* @{term "alphar n"} is monotonic.*}
-(********************************************)
+(* alphar is monotonic. *)
 
 lemma mono_alphar: "mono alphar"
   apply (subst alphar_alt_eq)
   unfolding alphar'_def prealphar_def
   using pnn.\<alpha>\<^sub>f_mono unfolding mono_def by simp
 
-(********************************************)
-subsubsection{* Like @{term \<alpha>}, @{term alphar} grows at most by one at a time. *}
-(********************************************)
-
+(* Like \<alpha>, alphar grows at most by one at a time. *)
 lemma alphar_grows_one_by_one:
   "alphar (Suc n) \<le> Suc (alphar n)"
   apply (subst alphar_alt_eq)+
   unfolding alphar'_def prealphar_def
   using \<alpha>_grows_one_by_one[OF pos] by auto
 
-(********************************************)
-\<comment>\<open> If @{term r} is 1, then @{term "alphar n"} is as follows. \<close>
-(********************************************)
 
+(* If r is 1, then "alphar n" is as follows. *)
 lemma alphar_one: assumes "r = 1" shows "alphar n  = Suc (\<alpha> (Suc n))"
   apply (subst alphar_alt_eq)
   apply (subst \<alpha>_alt_eq)
-  unfolding alphar'_def prealphar_def pnn.\<alpha>\<^sub>f_def A1nn.\<alpha>\<^sub>f_def using assms by blast
+  unfolding alphar'_def prealphar_def \<alpha>'_def pnn.\<alpha>\<^sub>f_def A1nn.\<alpha>\<^sub>f_def using assms by blast
 
-(********************************************)
-\<comment>\<open> @{term "alphar r"} is 1. (Exploited on page 18.) \<close>
-(********************************************)
+(* "alphar r" is 1. (Exploited on page 18.) *)
 
 lemma alphar_r:
   "alphar r = 1"
@@ -768,10 +762,7 @@ proof -
   thus "Suc (local.prealphar r) = 1" by force
 qed
 
-(********************************************)
-\<comment>\<open> If @{term r} is less than @{term n}, then @{term "alphar n"} is at least two (page 17). \<close>
-(********************************************)
-
+(* If r is less than n, then "alphar n" is at least two (page 17). *)
 lemma alphar_geq_two: assumes "r < n" shows "1 < alphar n"  
   apply (subst alphar_alt_eq)
   unfolding alphar'_def
@@ -780,15 +771,14 @@ lemma alphar_geq_two: assumes "r < n" shows "1 < alphar n"
   apply (rule pnn.\<alpha>\<^sub>f_spec_direct_contrapositive)
   apply (subst Ackermann_base_eq) using assms by simp
 
-(********************************************)
-\<comment>\<open> @{term "Ackermann (prealphar n) r"} is greater than @{term n} (page 17). \<close>
-(********************************************)
-
+(* "Ackermann (prealphar n) r" is greater than n (page 17). *)
 lemma Ackermann_prealphar_gt: "n < Ackermann (prealphar n) r"
 proof -
   have "Suc n \<le> Ackermann (prealphar n) r" using pnn.f_\<alpha>\<^sub>f unfolding prealphar_def by simp
   thus ?thesis by simp
 qed
+  
+
 
 end
 
