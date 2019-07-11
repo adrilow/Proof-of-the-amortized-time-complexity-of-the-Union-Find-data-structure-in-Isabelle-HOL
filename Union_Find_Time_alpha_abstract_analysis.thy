@@ -673,10 +673,18 @@ definition index where "index l rkl i \<equiv> Max {k. rankr rkl (l!i)
 (*This relation points towards rep_of, so (i,rep_of l i) \<in> ufa_\<beta> l*)
 definition ufa_\<beta>_start :: "nat list \<Rightarrow> (nat\<times>nat) set" 
   where "ufa_\<beta>_start l 
-    \<equiv> {(x,y). x<length l \<and> y<length l \<and> l!x = y}"
+    \<equiv> {(x,y). x<length l \<and> y<length l \<and> x\<noteq>y \<and> l!x = y}"
 
 definition ufa_\<beta> :: "nat list \<Rightarrow> (nat\<times>nat) set"
   where "ufa_\<beta> l \<equiv> trancl (ufa_\<beta>_start l)"
+
+
+lemma ufa_\<beta>_dom: " Domain (ufa_\<beta> l) \<subseteq> {0..<length l}" 
+  unfolding ufa_\<beta>_def ufa_\<beta>_start_def 
+  apply (subst trancl_domain) by fastforce 
+
+lemma rep_of_ufa_\<beta>: assumes "ufa_invar l" "i <length l" "i\<noteq>rep_of l i" shows "(i,rep_of l i) \<in> ufa_\<beta> l "
+  apply (subst rep_of_iff[OF assms(1,2)]) unfolding ufa_\<beta>_def ufa_\<beta>_start_def sorry
 
 subsubsection{*Closures with distances*}
 
@@ -703,8 +711,8 @@ definition descendants where
 definition ancestors where
   "ancestors l i = {j. (i,j)\<in> ufa_\<beta> l}"
 
-definition invar_rank where "invar_rank l rkl \<equiv> ( length l = length rkl 
-                            \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<comment>\<open>\<and> i\<noteq>j This seems to not be necessary\<close> \<longrightarrow> rkl ! i < rkl ! j) 
+definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
+                            \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<and>  i\<noteq>j \<longrightarrow> rkl ! i < rkl ! j) 
                             \<comment> \<open>if j is on the path from i to rep_of l i, then rank of j is bigger than rank of i\<close>
                             \<and> sum (\<lambda>i. if l!i=i then rkl!i else 0) {0..<length l} \<le> length l
                             \<and> (\<forall>i<length l. l!i=i \<longrightarrow> (2::nat) ^ rkl!i \<le> card (descendants l i)) )"
@@ -721,16 +729,9 @@ definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x
 definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
 
 
-subsection{*Lemmas About the rank from UnionFind11Rank and UnionFind41Potential*}
+subsection{*Lemmas About the rank from UnionFind11Rank, UnionFind21Parent and UnionFind41Potential*}
 
-
-lemma \<rho>_leq_rankr: "\<rho> \<le> rankr rkl x"
-  unfolding rankr_def by simp
-
-lemma ranrk_positive: "0 < rankr rkl x"
-  unfolding rankr_def using \<rho>_geq_1 by fastforce
-
-lemma parent_has_nonzero_rank: assumes "invar_rank l rkl" "l!i = j" "i < length l" "j < length l" 
+lemma parent_has_nonzero_rank: assumes "invar_rank l rkl" "l!i = j" "i < length l" "j < length l" "i\<noteq>j"
    shows "0<rkl!j"
 proof -
   have "rkl!i < rkl!j" using assms unfolding invar_rank_def by blast
@@ -742,8 +743,8 @@ qed
   then @{term "rkl!i + k \<le> rkl!j"} holds\<close>
 
 lemma rank_bounds_height_precise: 
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "kpath (ufa_\<beta>_start l) i j k" 
-  shows "rkl!i + k \<le> rkl!j" using assms(4) 
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "kpath (ufa_\<beta>_start l) i j k" 
+  shows "rkl!i + k \<le> rkl!j" using assms(5) 
 proof (induction rule: kpath.induct)
   case (kpath_into_rtrancl x y z k)
   have "rkl!x < rkl!y" using assms(1) kpath_into_rtrancl(1) 
@@ -756,29 +757,29 @@ qed simp
    a path that leads to a vertex y has length at most @{term "rkl!y"}. In the absence
    of path compression, we could actually require an equality. \<close>
 
-lemma rank_bounds_heigth:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "kpath (ufa_\<beta>_start l) i j k"
+lemma rank_bounds_height:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "kpath (ufa_\<beta>_start l) i j k"
   shows "k \<le> rkl!j"
   using rank_bounds_height_precise[OF assms] by linarith
 
 
 lemma rank_increases_along_path_refl:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
   shows "rkl!i \<le> rkl!j"
 proof -
   obtain "k" where kstuff: "kpath (ufa_\<beta>_start l) i j k" 
-    using assms(4) rtclosure_kpath[of i j "ufa_\<beta>_start l" ] by blast
-  then show ?thesis using rank_bounds_height_precise[OF assms(1-3) kstuff] by simp
+    using assms(5) rtclosure_kpath[of i j "ufa_\<beta>_start l" ] by blast
+  then show ?thesis using rank_bounds_height_precise[OF assms(1-4) kstuff] by simp
 qed
 
 \<comment>\<open>Rank increases strictly along a nontrivial path.\<close>
 lemma rank_increases_strictly_along_path:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> ufa_\<beta> l"
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
   shows "rkl!i < rkl!j"
 proof -
   obtain "k" where kstuff: "k>0" "kpath (ufa_\<beta>_start l) i j k" 
-    using assms(4) tclosure_kpath[of i j "ufa_\<beta>_start l" ] unfolding ufa_\<beta>_def by blast
-  then show ?thesis using rank_bounds_height_precise[OF assms(1-3) kstuff(2)] by simp
+    using assms(5) tclosure_kpath[of i j "ufa_\<beta>_start l" ] unfolding ufa_\<beta>_def by blast
+  then show ?thesis using rank_bounds_height_precise[OF assms(1-4) kstuff(2)] by simp
 qed
 
 lemma ancestor_has_greater_rank:
@@ -791,31 +792,135 @@ lemma ancestor_has_greater_rank:
 \<comment>\<open>Remember @{thm ufa_\<alpha>_dom}, 
   @{term "i < length l"} is equivalent to @{term "i \<in> Domain (ufa_\<alpha> l)"}\<close>
 
-lemma ufa_\<beta>_dom: "ufa_invar l \<Longrightarrow> Domain (ufa_\<beta> l) = {0..<length l}" 
-  unfolding ufa_\<beta>_def ufa_\<beta>_start_def
-  apply (subst trancl_domain) unfolding ufa_invar_def by fastforce
-
-
 lemma rank_is_logarithmic:
-  assumes "invar_rank' l rkl" "i < length l"
+  assumes "invar_rank l rkl" "i < length l"
   shows "rkl!i \<le> Discrete.log (length l)"
 proof -
   { \<comment>\<open>First we prove this for roots\<close>
     fix i
     assume "i < length l" and is_root:"l!i=i"
-    have crad: "{j. (j, i) \<in> ufa_\<beta> l} \<subseteq> {0..<length l}" unfolding ufa_\<beta>_def ufa_\<beta>_start_def
-      using \<open>i < length l\<close> assms(1) invar_rank'_def invar_rank_def is_root by blast
+    have crad: "{j. (j, i) \<in> ufa_\<beta> l} \<subseteq> {0..<length l}" using ufa_\<beta>_dom by blast
     have sg1: "card (descendants l i) \<le> length l" unfolding descendants_def using ufa_\<beta>_dom
       using crad subset_eq_atLeast0_lessThan_card by blast
     have "rkl!i \<le> Discrete.log (length l)"
-      apply (rule prove_le_log) using assms sg1 \<open>i < length l\<close> is_root unfolding invar_rank'_def invar_rank_def
-      by blast
+      apply (rule prove_le_log) using assms sg1 \<open>i < length l\<close> is_root unfolding invar_rank_def
+      by force
   } note root = this
-  have "(1::nat) = 2" 
-    by (metis (no_types, lifting) assms invar_rank'_def invar_rank_def not_less_iff_gr_or_eq rep_of_bound rep_of_min)
-  hence "False" by simp
-  thus ?thesis by simp
-qed \<comment>\<open> :) \<close>
+  thus ?thesis proof (cases "l!i=i")
+    case False
+    obtain j where j_def:"j = rep_of l i" by simp
+    have "l!j = j" using rep_of_min[of l i] j_def assms unfolding invar_rank_def by argo
+    have "i \<noteq> rep_of l i" using False rep_of_iff[OF _ assms(2)] assms(1) \<open>l ! j = j\<close> j_def 
+      unfolding invar_rank_def by force 
+    have sg1: "(i,j) \<in> ufa_\<beta> l" using j_def rep_of_ufa_\<beta>[OF _ assms(2) \<open>i\<noteq>rep_of l i\<close>]  assms(1) 
+      unfolding invar_rank_def by fastforce
+    hence "j < length l" using assms unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
+      using j_def rep_of_bound by blast 
+    have "rkl!i < rkl!j" using rank_increases_strictly_along_path[OF assms \<open>j < length l\<close> _ sg1] 
+         \<open>i\<noteq>rep_of l i\<close> j_def by blast
+    then show ?thesis using root[OF \<open>j<length l\<close> \<open>l!j=j\<close>] by linarith
+  qed (simp add: root assms(2))
+qed
+
+\<comment>\<open>Really equivalent to @{thm height_of_ub}\<close>
+
+lemma height_is_logarithmic:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "kpath (ufa_\<beta>_start l) i j k" 
+  shows "k \<le> Discrete.log (length l)"
+proof -
+  have "k \<le> rkl!j" using rank_bounds_height[OF assms] .
+  also have "\<dots> \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms(1,3)] .
+  finally show ?thesis .
+qed
+
+
+lemma log_lt_n: "0 < n \<Longrightarrow> Discrete.log n < n"
+  by (induction rule: Discrete.log_induct) simp+
+
+
+lemma rank_is_linear: assumes "invar_rank l rkl" "i < length l" 
+  shows "rkl ! i < length l"
+proof -
+  have "0 < length l" using \<open>i < length l\<close> by simp
+  have "rkl ! i \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms] .
+  also have "\<dots> < length l" using log_lt_n[OF \<open>0<length l\<close>] .
+  finally show ?thesis .
+qed
+
+
+lemma \<rho>_leq_rankr: "\<rho> \<le> rankr rkl x"
+  unfolding rankr_def by simp
+
+lemma ranrk_positive: "0 < rankr rkl x"
+  unfolding rankr_def using \<rho>_geq_1 by fastforce
+
+lemma rankr_increases_along_path_refl:
+ assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+ shows "rankr rkl i \<le> rankr rkl j"
+  unfolding rankr_def using rank_increases_along_path_refl[OF assms] by auto
+
+lemma rankr_increases_strictly_along_path:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
+  shows "rankr rkl i < rankr rkl j"
+  unfolding rankr_def using rank_increases_strictly_along_path[OF assms] by auto
+
+
+lemma \<alpha>\<^sub>r_rankr_grows_along_a_path:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
+  shows "\<alpha>\<^sub>r (rankr rkl i) \<le> \<alpha>\<^sub>r (rankr rkl j)"
+  using mono_alphar[of \<rho>] using \<rho>_geq_1 rankr_increases_strictly_along_path[OF assms] 
+  unfolding mono_def by fastforce
+
+
+lemma parent_has_greater_rank:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "rkl!i < rkl!(l!i)"
+  using assms unfolding invar_rank_def ufa_invar_def by auto
+
+lemma path_to_parent:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "(i,l!i) \<in> ufa_\<beta> l"
+  using assms ufa_invarD(2) unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
+  by fastforce
+
+
+lemma rep_of_parent_is_same:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "(i,l!i) \<in> ufa_\<alpha> l"
+  sorry
+
+(*UnionFind21Parent is_equiv_parent <-- UnionFind01Data path_is_equiv*)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+lemma parent_has_greater_rankr:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "rankr rkl i < rankr rkl (l!i)"
+  unfolding rankr_def using parent_has_greater_rank
+
+
+
+
+
+
+
+
+
 
 
 lemma level_to_alpha: 
