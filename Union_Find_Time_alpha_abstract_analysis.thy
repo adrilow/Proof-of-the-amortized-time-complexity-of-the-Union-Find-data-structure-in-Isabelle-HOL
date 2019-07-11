@@ -5,7 +5,7 @@ imports
   "../../Refine_Imperative_HOL/Sepref_Additional" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
-  "SepLogicTime_RBTreeBasic.Asymptotics_1D"
+  \<comment>\<open>"SepLogicTime_RBTreeBasic.Asymptotics_1D"\<close>
   UnionFind_Impl
   Ackermann
 begin
@@ -135,6 +135,9 @@ lemma ufa_\<alpha>_lenD:
 
 lemma ufa_\<alpha>_dom[simp]: "Domain (ufa_\<alpha> l) = {0..<length l}"
   unfolding ufa_\<alpha>_def by auto
+
+lemma ufa_\<alpha>_dom_card: "card (Domain (ufa_\<alpha> l)) = length l"
+  by simp
 
 lemma ufa_\<alpha>_refl[simp]: "(i,i)\<in>ufa_\<alpha> l \<longleftrightarrow> i<length l"
   unfolding ufa_\<alpha>_def
@@ -651,27 +654,22 @@ qed
 
 section{*Stuff about the rank (TODO) (by Adrián Löwenberg)*}
 
-definition \<rho> where "\<rho> = (1::nat)"
+subsection{*Definitions*}
+
+definition \<rho> where "\<rho> \<equiv> 1::nat "
+
+\<comment>\<open>@{term \<rho>} is arbitray but the following must be true\<close>
+lemma \<rho>_geq_1: "1 \<le> \<rho>" unfolding \<rho>_def ..
 
 abbreviation \<alpha>\<^sub>r where "\<alpha>\<^sub>r n \<equiv> alphar \<rho> n"
 
 definition rankr where "rankr rkl i \<equiv> (rkl ! i) + \<rho>"
 
-definition level where "level l rkl i \<equiv> Suc (Max {k. rankr rkl (l!i) \<ge> (Ackermann k (rankr rkl i))})"
-
-lemma level_to_alpha: 
-  assumes "ufa_invar l" 
-  shows "1\<le> level l rkl i"
-        "level l rkl i < \<alpha>\<^sub>r (rankr rkl (l!i))"
-  using assms  unfolding level_def rankr_def alphar_def ufa_invar_def
-  apply safe
-  apply auto
-  sorry
+definition level where "level l rkl i \<equiv> Suc (Greatest (\<lambda>k. rankr rkl (l!i) \<ge> (Ackermann k (rankr rkl i))))"
 
 definition index where "index l rkl i \<equiv> Max {k. rankr rkl (l!i) 
                                         \<ge> (Ackermann k (rankr rkl i)  ^^ k)}"
 
-term ufa_\<alpha>
 (*This relation points towards rep_of, so (i,rep_of l i) \<in> ufa_\<beta> l*)
 definition ufa_\<beta>_start :: "nat list \<Rightarrow> (nat\<times>nat) set" 
   where "ufa_\<beta>_start l 
@@ -679,6 +677,156 @@ definition ufa_\<beta>_start :: "nat list \<Rightarrow> (nat\<times>nat) set"
 
 definition ufa_\<beta> :: "nat list \<Rightarrow> (nat\<times>nat) set"
   where "ufa_\<beta> l \<equiv> trancl (ufa_\<beta>_start l)"
+
+subsubsection{*Closures with distances*}
+
+inductive kpath 
+  for r :: "('a \<times> 'a) set"
+  where
+    kpath_refl [intro!, Pure.intro!, simp]: "kpath r x x 0"
+  | kpath_into_rtrancl [Pure.intro]: 
+      "(x, y) \<in> r \<Longrightarrow> kpath r y z k \<Longrightarrow> kpath r x z (Suc k)"
+
+lemma kpath_rtclosure: assumes "kpath r x y k" shows "(x,y) \<in> r\<^sup>*"
+  sorry
+
+lemma rtclosure_kpath: assumes "(x,y) \<in> r\<^sup>*" shows "\<exists>k. kpath r x y k"
+  sorry
+
+lemma tclosure_kpath: assumes "(x,y) \<in> r\<^sup>+" shows "\<exists>k>0. kpath r x y k"
+  sorry
+
+
+definition descendants where 
+  "descendants l i = {j. (j,i)\<in> ufa_\<beta> l}"
+
+definition ancestors where
+  "ancestors l i = {j. (i,j)\<in> ufa_\<beta> l}"
+
+definition invar_rank where "invar_rank l rkl \<equiv> ( length l = length rkl 
+                            \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<comment>\<open>\<and> i\<noteq>j This seems to not be necessary\<close> \<longrightarrow> rkl ! i < rkl ! j) 
+                            \<comment> \<open>if j is on the path from i to rep_of l i, then rank of j is bigger than rank of i\<close>
+                            \<and> sum (\<lambda>i. if l!i=i then rkl!i else 0) {0..<length l} \<le> length l
+                            \<and> (\<forall>i<length l. l!i=i \<longrightarrow> (2::nat) ^ rkl!i \<le> card (descendants l i)) )"
+                            \<comment>\<open>rank i \<le> log (card (Domain (ufa_\<alpha> l)))\<close>
+
+definition invar_rank' where "invar_rank' l rkl \<equiv> ufa_invar l \<and> invar_rank l rkl"
+
+definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x
+                    then \<alpha>\<^sub>r (rankr rkl x) * Suc (\<alpha>\<^sub>r (rankr rkl x))    
+                    else (if \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x)) 
+                        then (\<alpha>\<^sub>r (rankr rkl x) - level l rkl x) * (rankr rkl x) - index l rkl x + 1
+                        else 0)"
+
+definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
+
+
+subsection{*Lemmas About the rank from UnionFind11Rank and UnionFind41Potential*}
+
+
+lemma \<rho>_leq_rankr: "\<rho> \<le> rankr rkl x"
+  unfolding rankr_def by simp
+
+lemma ranrk_positive: "0 < rankr rkl x"
+  unfolding rankr_def using \<rho>_geq_1 by fastforce
+
+lemma parent_has_nonzero_rank: assumes "invar_rank l rkl" "l!i = j" "i < length l" "j < length l" 
+   shows "0<rkl!j"
+proof -
+  have "rkl!i < rkl!j" using assms unfolding invar_rank_def by blast
+  thus ?thesis by linarith
+qed
+
+
+\<comment>\<open>Because rank increases along edges, if there is a path of length k from i to j, 
+  then @{term "rkl!i + k \<le> rkl!j"} holds\<close>
+
+lemma rank_bounds_height_precise: 
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "kpath (ufa_\<beta>_start l) i j k" 
+  shows "rkl!i + k \<le> rkl!j" using assms(4) 
+proof (induction rule: kpath.induct)
+  case (kpath_into_rtrancl x y z k)
+  have "rkl!x < rkl!y" using assms(1) kpath_into_rtrancl(1) 
+    unfolding invar_rank_def ufa_\<beta>_start_def by blast
+  then show ?case using kpath_into_rtrancl by simp
+qed simp
+
+
+\<comment>\<open> The rank of a vertex is an upper bound on its height in the forest. That is,
+   a path that leads to a vertex y has length at most @{term "rkl!y"}. In the absence
+   of path compression, we could actually require an equality. \<close>
+
+lemma rank_bounds_heigth:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "kpath (ufa_\<beta>_start l) i j k"
+  shows "k \<le> rkl!j"
+  using rank_bounds_height_precise[OF assms] by linarith
+
+
+lemma rank_increases_along_path_refl:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "rkl!i \<le> rkl!j"
+proof -
+  obtain "k" where kstuff: "kpath (ufa_\<beta>_start l) i j k" 
+    using assms(4) rtclosure_kpath[of i j "ufa_\<beta>_start l" ] by blast
+  then show ?thesis using rank_bounds_height_precise[OF assms(1-3) kstuff] by simp
+qed
+
+\<comment>\<open>Rank increases strictly along a nontrivial path.\<close>
+lemma rank_increases_strictly_along_path:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> ufa_\<beta> l"
+  shows "rkl!i < rkl!j"
+proof -
+  obtain "k" where kstuff: "k>0" "kpath (ufa_\<beta>_start l) i j k" 
+    using assms(4) tclosure_kpath[of i j "ufa_\<beta>_start l" ] unfolding ufa_\<beta>_def by blast
+  then show ?thesis using rank_bounds_height_precise[OF assms(1-3) kstuff(2)] by simp
+qed
+
+lemma ancestor_has_greater_rank:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "j \<in> ancestors l i"
+  shows "rkl!i \<le> rkl!j"
+  using assms(4) unfolding ancestors_def 
+  using rank_increases_strictly_along_path[OF assms(1-3)] by fastforce
+
+
+\<comment>\<open>Remember @{thm ufa_\<alpha>_dom}, 
+  @{term "i < length l"} is equivalent to @{term "i \<in> Domain (ufa_\<alpha> l)"}\<close>
+
+lemma ufa_\<beta>_dom: "ufa_invar l \<Longrightarrow> Domain (ufa_\<beta> l) = {0..<length l}" 
+  unfolding ufa_\<beta>_def ufa_\<beta>_start_def
+  apply (subst trancl_domain) unfolding ufa_invar_def by fastforce
+
+
+lemma rank_is_logarithmic:
+  assumes "invar_rank' l rkl" "i < length l"
+  shows "rkl!i \<le> Discrete.log (length l)"
+proof -
+  { \<comment>\<open>First we prove this for roots\<close>
+    fix i
+    assume "i < length l" and is_root:"l!i=i"
+    have crad: "{j. (j, i) \<in> ufa_\<beta> l} \<subseteq> {0..<length l}" unfolding ufa_\<beta>_def ufa_\<beta>_start_def
+      using \<open>i < length l\<close> assms(1) invar_rank'_def invar_rank_def is_root by blast
+    have sg1: "card (descendants l i) \<le> length l" unfolding descendants_def using ufa_\<beta>_dom
+      using crad subset_eq_atLeast0_lessThan_card by blast
+    have "rkl!i \<le> Discrete.log (length l)"
+      apply (rule prove_le_log) using assms sg1 \<open>i < length l\<close> is_root unfolding invar_rank'_def invar_rank_def
+      by blast
+  } note root = this
+  have "(1::nat) = 2" 
+    by (metis (no_types, lifting) assms invar_rank'_def invar_rank_def not_less_iff_gr_or_eq rep_of_bound rep_of_min)
+  hence "False" by simp
+  thus ?thesis by simp
+qed \<comment>\<open> :) \<close>
+
+
+lemma level_to_alpha: 
+  assumes "ufa_invar l" 
+  shows "1\<le> level l rkl i"
+        "level l rkl i < \<alpha>\<^sub>r (rankr rkl (l!i))"
+  using assms  unfolding level_def rankr_def alphar_def ufa_invar_def
+  apply simp
+  apply auto
+  sorry
+
 
 term ufa_invar
 lemma ufa_\<beta>_order[simp, intro!]: "antisym (ufa_\<beta> l)" "trans (ufa_\<beta> l)"
@@ -693,16 +841,6 @@ next
 qed
 
 
-definition descendants where 
-  "descendants l i = {j. (j,i)\<in> ufa_\<beta> l}"
-
-term invar
-definition invar_rank where "invar_rank l rkl \<equiv> (length l = length rkl 
-                            \<and> (\<forall>i j. i< length l \<and> j< length l \<and> i\<noteq>j \<and> l!i = j \<longrightarrow> rkl ! i < rkl ! j) 
-                            \<comment> \<open>if j is on the path from i to rep_of l i, then rank of j is bigger than rank of i\<close>
-                            \<and> sum (\<lambda>i. if l!i=i then rkl!i else 0) {0..<length l} \<le> length l
-                            \<and> (\<forall>i<length l. l!i=i \<longrightarrow> (2::nat) ^ rkl!i \<le> card (descendants l i)) )"
-                            \<comment>\<open>rank i \<le> log (card (Domain (ufa_\<alpha> l)))\<close>
 
 thm invar_sli_le_l
 lemma invar_rank_sli_le_l:
@@ -723,15 +861,8 @@ proof -
 qed
 
 
-definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x 
-                    then \<alpha>\<^sub>r (rankr rkl x) * Suc (\<alpha>\<^sub>r (rankr rkl x))    
-                    else (if \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x)) 
-                        then (\<alpha>\<^sub>r (rankr rkl x) - level l rkl x) * (rankr rkl x) - index l rkl x + 1
-                        else 0)"
 
-definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
-
-lemma \<Phi>_simp[simp,code]: "\<Phi> l rkl = sum (\<lambda> x. \<phi> l rkl x) {0..<length l}"
+lemma \<Phi>_simp[simp]: "\<Phi> l rkl = sum (\<lambda> x. \<phi> l rkl x) {0..<length l}"
 proof -
   have 1: "(\<lambda>x. (+) (\<phi> l rkl x)) = (((+) \<circ>\<circ>\<circ> \<phi>) l rkl)" by auto
   show ?thesis
@@ -749,5 +880,5 @@ lemma amortized_cost_compress:
  shows "\<Phi> l rkl + 2* (\<alpha> (card (Domain (ufa_\<alpha> l)))) + 4 \<ge> \<Phi> (l[x := rep_of l x]) rkl + d + 1"
   sorry
 
-    
+
 end
