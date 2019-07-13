@@ -686,6 +686,18 @@ lemma ufa_\<beta>_dom: " Domain (ufa_\<beta> l) \<subseteq> {0..<length l}"
 lemma rep_of_ufa_\<beta>: assumes "ufa_invar l" "i <length l" "i\<noteq>rep_of l i" shows "(i,rep_of l i) \<in> ufa_\<beta> l "
   apply (subst rep_of_iff[OF assms(1,2)]) unfolding ufa_\<beta>_def ufa_\<beta>_start_def sorry
 
+lemma ufa_\<beta>_order[simp, intro!]: "antisym (ufa_\<beta> l)" "trans (ufa_\<beta> l)"
+   apply rule+
+proof goal_cases
+  case (1 x y)
+  then show ?case unfolding ufa_\<beta>_def ufa_\<beta>_start_def
+    sorry (*for this to be the case, I need the acyclicity of the graph*)
+next
+  case 2
+  then show ?case unfolding ufa_\<beta>_def by (simp add: trans_rtrancl)
+qed
+
+
 subsubsection{*Closures with distances*}
 
 inductive kpath 
@@ -872,6 +884,109 @@ lemma \<alpha>\<^sub>r_rankr_grows_along_a_path:
   unfolding mono_def by fastforce
 
 
+lemma rep_of_invar_along_path':
+  assumes "invar_rank l rkl" "i < length l" "i' < length l"  "j < length l" 
+          "i = rep_of l j" "(j,i) \<in> (ufa_\<beta>_start l)\<^sup>*"  "(j,i') \<in> (ufa_\<beta>_start l)\<^sup>*"
+        shows "i = rep_of l i'"
+  using assms(7)
+proof (induction rule: rtrancl_induct)
+  case base
+  then show ?case using assms(5) .
+next
+  case (step y z)
+  then show ?case unfolding ufa_\<beta>_start_def 
+    using assms(1) invar_rank_def rep_of_idx by fastforce
+qed
+
+lemma rep_of_invar_along_path:
+  assumes "invar_rank l rkl" "i < length l" "i' < length l"  "j < length l" 
+          "i = rep_of l j"  "(j,i') \<in> (ufa_\<beta>_start l)\<^sup>*"
+        shows "i = rep_of l i'"
+proof -
+  have sg1: "(j,i) \<in> (ufa_\<beta>_start l)\<^sup>*" proof (cases "j \<noteq> rep_of l j")
+    case True
+    then show ?thesis using rep_of_ufa_\<beta>[of l j] \<open>i=rep_of l j\<close> assms 
+      unfolding invar_rank_def ufa_\<beta>_def by auto      
+  next
+    case False
+    then show ?thesis unfolding ufa_\<beta>_start_def
+      using assms(5) by auto
+  qed
+  show ?thesis using rep_of_invar_along_path'[OF assms(1-5) sg1 assms(6)] .
+qed
+
+
+lemma rep_of_path_iff:
+  assumes "invar_rank l rkl" "i < length l" "j < length l"
+  shows "(rep_of l j = i) \<longleftrightarrow> ((j,i) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> l!i=i)"
+proof -
+  show ?thesis apply(subst rep_of_iff) 
+    subgoal using assms(1) unfolding invar_rank_def by simp 
+    subgoal using assms(3) .
+    subgoal apply safe proof goal_cases
+      case 1
+      then show ?case apply (subst rep_of_iff[symmetric]) 
+        subgoal using assms unfolding invar_rank_def by blast
+        subgoal using assms(3) .
+        apply (cases "j = rep_of l j") proof goal_cases
+        case 2
+        show ?case using rep_of_ufa_\<beta>[OF _ assms(3) 2(2)] assms(1) 
+          unfolding ufa_\<beta>_def invar_rank_def by simp
+      qed simp
+    next
+      case 2
+      then show ?case using rep_of_min rep_of_iff  assms unfolding invar_rank_def by force
+    next
+      case 3
+      hence "i = rep_of l i" by (simp add: rep_of_refl)
+      then show ?case using 3 assms(2,3) unfolding ufa_\<beta>_start_def apply (cases "i=j")
+      proof goal_cases
+        case 2
+        then show ?case apply (cases "l!j \<noteq> j") proof goal_cases
+          case 1
+          obtain i' where i'rep: "i' = rep_of l j" by blast
+          hence ji'path: "(j,i') \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_ufa_\<beta>[OF \<open>ufa_invar l\<close> assms(3) ] 1(7) 
+            unfolding ufa_\<beta>_def by fastforce
+          have "l!i'=i'" using i'rep by (simp add: \<open>ufa_invar l\<close> assms(3) rep_of_min)
+          hence i'rep': "i' = rep_of l i'" by (simp add: rep_of_refl)
+          hence lengthi': "i' < length l" by (simp add: \<open>ufa_invar l\<close> assms(3) i'rep rep_of_bound) 
+          have "i' = rep_of l i" 
+            using rep_of_invar_along_path[OF assms(1) \<open>i'<length l\<close> \<open>i<length l\<close> \<open>j<length l\<close> i'rep] 
+                ji'path 1(2) unfolding ufa_\<beta>_start_def by blast
+          hence "i = i'" using \<open>i = rep_of l i\<close> \<open>i' = rep_of l i'\<close> by blast
+          then show ?case using i'rep 
+            by (simp add: "1"(7) \<open>ufa_invar l\<close> assms(3) rep_of_step)
+        next
+          case 2
+          hence "l!j=j" by blast
+          with 2 (1-6) have "i=j" using converse_rtranclE' by force
+          then show ?case using 2(1-6) \<open>l!j=j\<close> by simp
+        qed
+      qed simp
+    qed
+    done
+qed
+
+
+\<comment>\<open>Two vertices connected by a path must be equivalent. (UnionFind01Data)\<close>
+lemma path_is_equiv:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
+  shows "(i,j) \<in> ufa_\<alpha> l"
+proof -
+  obtain r where "r = rep_of l j" by blast
+  have "r = l!r"
+    using \<open>r = rep_of l j\<close> assms(1) assms(3) invar_rank_def rep_of_min by auto
+  have "ufa_invar l" using assms(1) unfolding invar_rank_def by blast
+  have "r<length l"
+    using \<open>r = rep_of l j\<close> assms(1) assms(3) invar_rank_def rep_of_bound by blast
+  have "(i,r) \<in> ufa_\<beta> l" using \<open>(i,j) \<in> ufa_\<beta> l\<close> rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>j<length l\<close>]
+    using ufa_\<beta>_order(2) \<open>r = rep_of l j\<close> unfolding ufa_\<beta>_def by auto
+  hence "r = rep_of l i" using rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>i<length l\<close>] \<open>r = l!r\<close> 
+    unfolding ufa_\<beta>_def by fastforce
+  thus ?thesis using \<open>r = rep_of l j\<close>  assms(2,3) unfolding ufa_\<alpha>_def by blast  
+qed
+
+
 lemma parent_has_greater_rank:
   assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
   shows "rkl!i < rkl!(l!i)"
@@ -883,14 +998,12 @@ lemma path_to_parent:
   using assms ufa_invarD(2) unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
   by fastforce
 
-
+\<comment>\<open>is_equiv_parent (UnionFind21Parent)\<close>
 lemma rep_of_parent_is_same:
   assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
   shows "(i,l!i) \<in> ufa_\<alpha> l"
-  sorry
-
-(*UnionFind21Parent is_equiv_parent <-- UnionFind01Data path_is_equiv*)
-
+  using path_is_equiv[OF assms(1,2) _ assms(3)[symmetric] path_to_parent[OF assms]] ufa_invarD(2)  assms 
+  unfolding invar_rank_def by blast
 
 
 
@@ -934,16 +1047,6 @@ lemma level_to_alpha:
 
 
 term ufa_invar
-lemma ufa_\<beta>_order[simp, intro!]: "antisym (ufa_\<beta> l)" "trans (ufa_\<beta> l)"
-   apply rule+
-proof goal_cases
-  case (1 x y)
-  then show ?case unfolding ufa_\<beta>_def ufa_\<beta>_start_def
-    sorry (*for this to be the case, I need the acyclicity of the graph*)
-next
-  case 2
-  then show ?case unfolding ufa_\<beta>_def by (simp add: trans_rtrancl)
-qed
 
 
 
