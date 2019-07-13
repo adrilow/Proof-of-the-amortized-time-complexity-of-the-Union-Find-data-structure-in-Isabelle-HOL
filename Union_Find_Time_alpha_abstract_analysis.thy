@@ -661,11 +661,11 @@ definition \<rho> where "\<rho> \<equiv> 1::nat "
 \<comment>\<open>@{term \<rho>} is arbitray but the following must be true\<close>
 lemma \<rho>_geq_1: "1 \<le> \<rho>" unfolding \<rho>_def ..
 
+lemma \<rho>_gt_0: "0<\<rho>" using \<rho>_geq_1 by simp
+
 abbreviation \<alpha>\<^sub>r where "\<alpha>\<^sub>r n \<equiv> alphar \<rho> n"
-
+                                
 definition rankr where "rankr rkl i \<equiv> (rkl ! i) + \<rho>"
-
-definition level where "level l rkl i \<equiv> Suc (Greatest (\<lambda>k. rankr rkl (l!i) \<ge> (Ackermann k (rankr rkl i))))"
 
 definition index where "index l rkl i \<equiv> Max {k. rankr rkl (l!i) 
                                         \<ge> (Ackermann k (rankr rkl i)  ^^ k)}"
@@ -731,15 +731,6 @@ definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> lengt
                             \<comment>\<open>rank i \<le> log (card (Domain (ufa_\<alpha> l)))\<close>
 
 definition invar_rank' where "invar_rank' l rkl \<equiv> ufa_invar l \<and> invar_rank l rkl"
-
-definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x
-                    then \<alpha>\<^sub>r (rankr rkl x) * Suc (\<alpha>\<^sub>r (rankr rkl x))    
-                    else (if \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x)) 
-                        then (\<alpha>\<^sub>r (rankr rkl x) - level l rkl x) * (rankr rkl x) - index l rkl x + 1
-                        else 0)"
-
-definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
-
 
 subsection{*Lemmas About the rank from UnionFind11Rank, UnionFind21Parent and UnionFind41Potential*}
 
@@ -863,7 +854,7 @@ qed
 lemma \<rho>_leq_rankr: "\<rho> \<le> rankr rkl x"
   unfolding rankr_def by simp
 
-lemma ranrk_positive: "0 < rankr rkl x"
+lemma rankr_positive: "0 < rankr rkl x"
   unfolding rankr_def using \<rho>_geq_1 by fastforce
 
 lemma rankr_increases_along_path_refl:
@@ -885,7 +876,7 @@ lemma \<alpha>\<^sub>r_rankr_grows_along_a_path:
 
 
 lemma rep_of_invar_along_path':
-  assumes "invar_rank l rkl" "i < length l" "i' < length l"  "j < length l" 
+  assumes "ufa_invar l" "i < length l" "i' < length l"  "j < length l" 
           "i = rep_of l j" "(j,i) \<in> (ufa_\<beta>_start l)\<^sup>*"  "(j,i') \<in> (ufa_\<beta>_start l)\<^sup>*"
         shows "i = rep_of l i'"
   using assms(7)
@@ -899,7 +890,7 @@ next
 qed
 
 lemma rep_of_invar_along_path:
-  assumes "invar_rank l rkl" "i < length l" "i' < length l"  "j < length l" 
+  assumes "ufa_invar l" "i < length l" "i' < length l"  "j < length l" 
           "i = rep_of l j"  "(j,i') \<in> (ufa_\<beta>_start l)\<^sup>*"
         shows "i = rep_of l i'"
 proof -
@@ -917,7 +908,7 @@ qed
 
 
 lemma rep_of_path_iff:
-  assumes "invar_rank l rkl" "i < length l" "j < length l"
+  assumes "ufa_invar l" "i < length l" "j < length l"
   shows "(rep_of l j = i) \<longleftrightarrow> ((j,i) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> l!i=i)"
 proof -
   show ?thesis apply(subst rep_of_iff) 
@@ -970,7 +961,7 @@ qed
 
 \<comment>\<open>Two vertices connected by a path must be equivalent. (UnionFind01Data)\<close>
 lemma path_is_equiv:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
+  assumes "ufa_invar l" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
   shows "(i,j) \<in> ufa_\<alpha> l"
 proof -
   obtain r where "r = rep_of l j" by blast
@@ -986,46 +977,134 @@ proof -
   thus ?thesis using \<open>r = rep_of l j\<close>  assms(2,3) unfolding ufa_\<alpha>_def by blast  
 qed
 
-
-lemma parent_has_greater_rank:
-  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
-  shows "rkl!i < rkl!(l!i)"
-  using assms unfolding invar_rank_def ufa_invar_def by auto
-
 lemma path_to_parent:
-  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  assumes "ufa_invar l" "i < length l" "l!i\<noteq>i"
   shows "(i,l!i) \<in> ufa_\<beta> l"
   using assms ufa_invarD(2) unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
   by fastforce
 
 \<comment>\<open>is_equiv_parent (UnionFind21Parent)\<close>
 lemma rep_of_parent_is_same:
-  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  assumes "ufa_invar l" "i < length l" "l!i\<noteq>i"
   shows "(i,l!i) \<in> ufa_\<alpha> l"
   using path_is_equiv[OF assms(1,2) _ assms(3)[symmetric] path_to_parent[OF assms]] ufa_invarD(2)  assms 
   unfolding invar_rank_def by blast
 
+\<comment>\<open>@{thm rep_of_idx} is equivalent to is_repr_parent (UnionFind21Parent)\<close>
+
+lemma path_from_parent_to_rep_of:
+  assumes "ufa_invar l" "i < length l" "j = rep_of l i"
+  shows "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  using assms rep_of_idx[OF assms(1,2)] rep_of_bound[OF assms(1,2)] rep_of_path_iff by blast
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+lemma parent_has_greater_rank:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "rkl!i < rkl!(l!i)"
+  using assms unfolding invar_rank_def ufa_invar_def by auto
 
 
 lemma parent_has_greater_rankr:
   assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
   shows "rankr rkl i < rankr rkl (l!i)"
-  unfolding rankr_def using parent_has_greater_rank
+  unfolding rankr_def using parent_has_greater_rank assms unfolding \<rho>_def by simp
 
+lemma \<alpha>\<^sub>r_rankr_grows_along_edges:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i"
+  shows "\<alpha>\<^sub>r (rankr rkl i) \<le> \<alpha>\<^sub>r (rankr rkl (l!i))"
+  using mono_alphar[OF \<rho>_gt_0] parent_has_greater_rankr[OF assms] unfolding mono_def by simp
+
+lemma \<alpha>\<^sub>r_rankr_grows_along_edges_corollary:
+  assumes "invar_rank l rkl" "i < length l" "l!i\<noteq>i" "\<alpha>\<^sub>r (rankr rkl i) \<noteq> \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "\<alpha>\<^sub>r (rankr rkl i) < \<alpha>\<^sub>r (rankr rkl (l!i))"
+  using \<alpha>\<^sub>r_rankr_grows_along_edges[OF assms(1-3)] assms(4) by linarith
+
+
+section{*Level: Definition and Lemmas*}
+\<comment>\<open>The level of @{term i} is defined as one plus the @{term "Greatest k"} such that
+   @{term "Ackermann k (rankr rkl i)"} is less than or equal to @{term "rankr rkl (l!i)"}.\<close>
+
+
+
+context
+  fixes l::"nat list" and rkl::"nat list" and i::nat
+  assumes contextasm: "invar_rank l rkl" "i<length l" "l!i\<noteq>i"
+begin
+
+definition defk where "defk k \<equiv> Ackermann k (rankr rkl i)"
+
+interpretation lnn: f_nat_nat "defk"
+  apply standard subgoal using Ackermann_strict_mono_in_k rankr_positive unfolding defk_def by blast
+  subgoal using Ackermann_k_x_tends_to_infinity_along_k rankr_positive unfolding defk_def by blast
+  done
+
+definition prek where "prek \<equiv> lnn.\<beta>\<^sub>f (rankr rkl (l!i))"
+
+definition level where "level \<equiv> Suc prek"
+
+definition level' where "level' l' rkl' i' \<equiv> Suc (Greatest (\<lambda>k. rankr rkl' (l'!i') 
+                                              \<ge> (Ackermann k (rankr rkl' i'))))"
+
+
+\<comment>\<open>The following lemma proves that @{term level} is well-defined.\<close>
+lemma level_exists:
+  "Ackermann 0 (rankr rkl i) \<le> rankr rkl (l!i)"
+  apply (subst Ackermann_base_eq) using parent_has_greater_rankr[OF contextasm] by simp
+
+\<comment>\<open> The level of @{term i} seems to be a measure of the distance of the rank
+   of @{term i} and the rank of its parent. In the case where these ranks
+   are closest, @{term "rankr rkl (l!i)"} is @{term "Suc (rankr rkl i)"}, so level is 1. \<close>
+
+lemma level_is_one:
+  assumes "(rkl!(l!i)) = Suc (rkl!i)"
+  shows "level = 1"
+  unfolding level_def prek_def 
+proof -
+  have f: "rankr rkl (l!i) = Suc (rankr rkl i)" using assms unfolding rankr_def by simp
+  show "Suc (lnn.\<beta>\<^sub>f (rankr rkl (l ! i))) = 1" apply (subst f)
+    using \<beta>_x_Suc_x[OF rankr_positive[of rkl i]] unfolding defk_def by simp
+qed
+
+\<comment>\<open> In the case where these ranks are furthest away, @{term "rankr rkl i"} is r and
+   @{term "rankr rkl (l!i)"} is, well, whatever it is. We find that the level is
+   less than @{term "\<alpha>\<^sub>r (rankr rkl (l!i))"}. (Page 18.) \<close>
+
+lemma lt_le_trans: "(a::nat) < b \<Longrightarrow> b \<le> c \<Longrightarrow> a < c" by auto
+
+lemma defk_unfold: "defk k = defalphar (rankr rkl i) k" unfolding defk_def
+  by blast
+
+lemma level_lt_\<alpha>\<^sub>r:
+  "level < \<alpha>\<^sub>r (rankr rkl (l!i))"
+  apply (subst alphar_alt_eq)
+  subgoal using \<rho>_gt_0 .
+  apply (subst alphar'_def)
+  subgoal using \<rho>_gt_0 .
+  unfolding level_def
+  apply simp
+  unfolding prek_def
+  apply (rule lnn.\<beta>\<^sub>f_spec_direct_contrapositive) unfolding defk_def
+  subgoal by (simp add: level_exists)
+  apply (rule order.strict_trans2) 
+   apply (subst Ackermann_prealphar_gt[of \<rho> "rankr rkl (l!i)" , OF \<rho>_gt_0])
+  subgoal ..
+proof -
+  have "\<rho> \<le> (rankr rkl i) " using \<rho>_leq_rankr by simp
+  thus "defalphar \<rho> (prealphar \<rho> (rankr rkl (l ! i)))
+    \<le> defalphar (rankr rkl i)
+        (prealphar \<rho> (rankr rkl (l ! i)))" using mono_Ackermann unfolding mono_def by blast
+qed
+  
+
+end
+
+definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x
+                    then \<alpha>\<^sub>r (rankr rkl x) * Suc (\<alpha>\<^sub>r (rankr rkl x))    
+                    else (if \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x)) 
+                        then (\<alpha>\<^sub>r (rankr rkl x) - level l rkl x) * (rankr rkl x) - index l rkl x + 1
+                        else 0)"
+
+definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
 
 
 
@@ -1087,6 +1166,5 @@ lemma amortized_cost_compress:
   assumes "ufa_invar l"
  shows "\<Phi> l rkl + 2* (\<alpha> (card (Domain (ufa_\<alpha> l)))) + 4 \<ge> \<Phi> (l[x := rep_of l x]) rkl + d + 1"
   sorry
-
 
 end
