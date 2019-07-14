@@ -680,17 +680,34 @@ lemma ufa_\<beta>_dom: " Domain (ufa_\<beta> l) \<subseteq> {0..<length l}"
   unfolding ufa_\<beta>_def ufa_\<beta>_start_def 
   apply (subst trancl_domain) by fastforce 
 
-lemma rep_of_ufa_\<beta>: assumes "ufa_invar l" "i <length l" "i\<noteq>rep_of l i" shows "(i,rep_of l i) \<in> ufa_\<beta> l "
-  apply (subst rep_of_iff[OF assms(1,2)]) unfolding ufa_\<beta>_def ufa_\<beta>_start_def sorry
-
-lemma ufa_\<beta>_order[simp, intro!]: "antisym (ufa_\<beta> l)" "trans (ufa_\<beta> l)"
-   apply rule+
-proof goal_cases
-  case (1 x y)
-  then show ?case unfolding ufa_\<beta>_def ufa_\<beta>_start_def
-    sorry (*for this to be the case, I need the acyclicity of the graph*)
+lemma rep_of_ufa_\<beta>_refl: 
+  assumes "ufa_invar l" "i <length l" 
+  shows "(i,rep_of l i) \<in> (ufa_\<beta>_start l)\<^sup>* " 
+  unfolding ufa_\<beta>_def  
+proof (induction rule: rep_of_induct[OF assms(1,2)])
+  case (1 i)
+  then show ?case using rep_of_refl[OF 1(3)] by simp
 next
-  case 2
+  case (2 i)
+  have "(i, l ! i) \<in> ufa_\<beta>_start l"
+      unfolding ufa_\<beta>_start_def using 2 assms(1) ufa_invarD(2) by force
+  then show ?case using 2 rep_of_idx[OF assms(1) \<open>i < length l\<close>]
+      converse_rtrancl_into_rtrancl[of i _ "ufa_\<beta>_start l" "rep_of l i"] by auto
+qed
+    
+lemma rep_of_ufa_\<beta>:
+  assumes "ufa_invar l" "i <length l" "i\<noteq>rep_of l i" 
+  shows "(i,rep_of l i) \<in> ufa_\<beta> l" 
+  unfolding ufa_\<beta>_def using rep_of_ufa_\<beta>_refl[OF assms(1,2)] assms(3)
+  by (simp add: rtrancl_eq_or_trancl)
+
+\<comment>\<open> I presume it is also antisymmetric, however that is not needed \<close>
+lemma ufa_\<beta>_order[simp, intro!]: 
+  assumes "ufa_invar l"
+  shows  "trans (ufa_\<beta> l)"
+   apply rule
+proof goal_cases
+  case 1
   then show ?case unfolding ufa_\<beta>_def by (simp add: trans_rtrancl)
 qed
 
@@ -704,14 +721,43 @@ inductive kpath
   | kpath_into_rtrancl [Pure.intro]: 
       "(x, y) \<in> r \<Longrightarrow> kpath r y z k \<Longrightarrow> kpath r x z (Suc k)"
 
+
 lemma kpath_rtclosure: assumes "kpath r x y k" shows "(x,y) \<in> r\<^sup>*"
-  sorry
+  using assms by (induction rule: kpath.induct) auto
 
 lemma rtclosure_kpath: assumes "(x,y) \<in> r\<^sup>*" shows "\<exists>k. kpath r x y k"
-  sorry
+  using assms proof (induction rule: rtrancl_induct)
+  case base
+  then show ?case using kpath_refl by blast
+next
+  case (step y z)
+  obtain k where path: "kpath r x y k" using step by blast
+  thus ?case using step(2) 
+  proof (induction rule: kpath.induct) 
+    case (kpath_refl x)
+    then show ?case using  kpath.kpath_refl kpath_into_rtrancl by fast
+  next
+    case (kpath_into_rtrancl x y' z' k)
+    then show ?case using kpath.kpath_into_rtrancl by fast
+  qed
+qed
 
 lemma tclosure_kpath: assumes "(x,y) \<in> r\<^sup>+" shows "\<exists>k>0. kpath r x y k"
-  sorry
+  using assms proof (induction rule: trancl_induct)
+  case (base y)
+  then show ?case using kpath_into_rtrancl by fast
+next
+  case (step y z)
+  obtain k where path: "k>0" "kpath r x y k" using step by blast
+  show ?case using path(2) step(2)
+  proof (induction rule: kpath.induct)
+    case (kpath_refl x)
+    then show ?case using kpath_into_rtrancl by fast
+  next
+    case (kpath_into_rtrancl x y z' k)
+    then show ?case using kpath.kpath_into_rtrancl by force
+  qed 
+qed
 
 
 definition descendants where 
@@ -968,7 +1014,7 @@ proof -
   have "r<length l"
     using \<open>r = rep_of l j\<close> assms(1) assms(3) invar_rank_def rep_of_bound by blast
   have "(i,r) \<in> ufa_\<beta> l" using \<open>(i,j) \<in> ufa_\<beta> l\<close> rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>j<length l\<close>]
-    using ufa_\<beta>_order(2) \<open>r = rep_of l j\<close> unfolding ufa_\<beta>_def by auto
+    using ufa_\<beta>_order \<open>r = rep_of l j\<close> unfolding ufa_\<beta>_def by auto
   hence "r = rep_of l i" using rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>i<length l\<close>] \<open>r = l!r\<close> 
     unfolding ufa_\<beta>_def by fastforce
   thus ?thesis using \<open>r = rep_of l j\<close>  assms(2,3) unfolding ufa_\<alpha>_def by blast  
