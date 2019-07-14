@@ -202,7 +202,10 @@ subsection {*@{term Ackermann} is monotonic in its first argument.
 
 
 lemma mono_pow_nat: "mono (f::nat\<Rightarrow>nat) \<Longrightarrow> mono (f ^^ n)"
- by (induct n) (auto simp: mono_def)
+  by (induct n) (auto simp: mono_def)
+
+lemma strict_mono_pow_nat: "strict_mono (f::nat\<Rightarrow>nat) \<Longrightarrow> strict_mono (f ^^ n)"
+  by (induct n) (simp add: strict_mono_def)+
 
 lemma mono_abase: "mono abase"
   unfolding abase_def mono_def by auto
@@ -706,9 +709,9 @@ begin
 definition alphar where
   "alphar n \<equiv> Suc (Least (\<lambda>k. Ackermann k r \<ge> Suc n))"
 
-abbreviation defalphar where "defalphar  \<equiv> \<lambda>k. Ackermann k r"
+\<comment>\<open>abbreviation defalphar where "defalphar  \<equiv> \<lambda>k. Ackermann k r"\<close>
 
-interpretation pnn: f_nat_nat "defalphar"
+interpretation pnn: f_nat_nat "\<lambda>k. Ackermann k r"
   apply standard subgoal using Ackermann_strict_mono_in_k[OF pos] .
   subgoal using Ackermann_k_x_tends_to_infinity_along_k[OF pos] .
   done

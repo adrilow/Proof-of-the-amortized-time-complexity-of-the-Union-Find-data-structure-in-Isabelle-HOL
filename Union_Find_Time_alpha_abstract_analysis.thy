@@ -667,9 +667,6 @@ abbreviation \<alpha>\<^sub>r where "\<alpha>\<^sub>r n \<equiv> alphar \<rho> n
                                 
 definition rankr where "rankr rkl i \<equiv> (rkl ! i) + \<rho>"
 
-definition index where "index l rkl i \<equiv> Max {k. rankr rkl (l!i) 
-                                        \<ge> (Ackermann k (rankr rkl i)  ^^ k)}"
-
 (*This relation points towards rep_of, so (i,rep_of l i) \<in> ufa_\<beta> l*)
 definition ufa_\<beta>_start :: "nat list \<Rightarrow> (nat\<times>nat) set" 
   where "ufa_\<beta>_start l 
@@ -1025,8 +1022,7 @@ section{*Level: Definition and Lemmas*}
    @{term "Ackermann k (rankr rkl i)"} is less than or equal to @{term "rankr rkl (l!i)"}.\<close>
 
 
-
-context
+context \<comment>\<open>NonRoot\<close>
   fixes l::"nat list" and rkl::"nat list" and i::nat
   assumes contextasm: "invar_rank l rkl" "i<length l" "l!i\<noteq>i"
 begin
@@ -1044,6 +1040,9 @@ definition level where "level \<equiv> Suc prek"
 
 definition level' where "level' l' rkl' i' \<equiv> Suc (Greatest (\<lambda>k. rankr rkl' (l'!i') 
                                               \<ge> (Ackermann k (rankr rkl' i'))))"
+
+lemma level_alt_eq: "level = level' l rkl i" 
+  unfolding level_def level'_def prek_def lnn.\<beta>\<^sub>f_def defk_def by blast
 
 
 \<comment>\<open>The following lemma proves that @{term level} is well-defined.\<close>
@@ -1069,13 +1068,7 @@ qed
    @{term "rankr rkl (l!i)"} is, well, whatever it is. We find that the level is
    less than @{term "\<alpha>\<^sub>r (rankr rkl (l!i))"}. (Page 18.) \<close>
 
-lemma lt_le_trans: "(a::nat) < b \<Longrightarrow> b \<le> c \<Longrightarrow> a < c" by auto
-
-lemma defk_unfold: "defk k = defalphar (rankr rkl i) k" unfolding defk_def
-  by blast
-
-lemma level_lt_\<alpha>\<^sub>r:
-  "level < \<alpha>\<^sub>r (rankr rkl (l!i))"
+lemma level_lt_\<alpha>\<^sub>r:  "level < \<alpha>\<^sub>r (rankr rkl (l!i))"
   apply (subst alphar_alt_eq)
   subgoal using \<rho>_gt_0 .
   apply (subst alphar'_def)
@@ -1088,48 +1081,217 @@ lemma level_lt_\<alpha>\<^sub>r:
   apply (rule order.strict_trans2) 
    apply (subst Ackermann_prealphar_gt[of \<rho> "rankr rkl (l!i)" , OF \<rho>_gt_0])
   subgoal ..
-proof -
-  have "\<rho> \<le> (rankr rkl i) " using \<rho>_leq_rankr by simp
-  thus "defalphar \<rho> (prealphar \<rho> (rankr rkl (l ! i)))
-    \<le> defalphar (rankr rkl i)
-        (prealphar \<rho> (rankr rkl (l ! i)))" using mono_Ackermann unfolding mono_def by blast
-qed
-  
+  using \<rho>_leq_rankr[of rkl i] mono_Ackermann unfolding mono_def by blast
+
+
+\<comment>\<open>Another connection between @{term rankr} at @{term i} and at @{term "l!i"}\<close>
+
+lemma rankr_parent_i_lt: "rankr rkl (l!i) < Ackermann level (rankr rkl i)"
+  unfolding level_def 
+  apply (subst defk_def[symmetric])
+  apply (rule lnn.\<beta>\<^sub>f_spec_reciprocal_contrapositive[of "rankr rkl (l ! i)" "Suc prek"] )
+  unfolding prek_def by blast
+
+
+section{*Index: Definition and Lemmas*}
+
+\<comment>\<open> The index of @{term i} is defined as the largest @{term j} such that @{term j} 
+  iterations of @{term "Ackermann prek"} take us from @{term "rankr rkl i"} 
+  to at most @{term "rankr rkl (l!i)"}. \<close>
+
+interpretation inn: f_nat_nat "\<lambda>j. compow j (Ackermann prek) (rankr rkl i)"
+proof (standard, goal_cases)
+  case 1
+  { fix x::nat and y::nat assume lt:"x<y"
+    have "compow x (Ackermann prek) (rankr rkl i) < compow ((y-x) + x) (Ackermann prek) (rankr rkl i)"
+      apply (subst funpow_add) apply simp
+      apply (rule compow_Ackermann_k_strictly_inflationary
+            [of "(y - x)"  "(Ackermann local.prek ^^ x) (rankr rkl i)" "local.prek"])
+      using lt by fastforce
+  } thus ?case unfolding strict_mono_def by auto
+next
+  case 2
+  then show ?case using compow_i_Ackermann_tends_to_infinity_along_i[of prek "(rankr rkl i)"] .
+qed 
+
+definition index where "index \<equiv> inn.\<beta>\<^sub>f (rankr rkl (l!i))"
+\<comment>\<open>If that sounds crazy, it is\<close>
+
+definition index' where "index' l' rkl' i' \<equiv> Greatest (\<lambda>j. rankr rkl' (l'!i')
+                        \<ge> compow j (Ackermann (level - 1)) (rankr rkl' i'))"
+lemma index_alt_eq: 
+  shows "index = index' l rkl i"
+  unfolding index_def index'_def inn.\<beta>\<^sub>f_def level_def by simp
+
+
+\<comment>\<open>The following lemmas justify that index is well defined\<close>
+
+lemma index_exists: 
+  "compow 0 (Ackermann prek) (rankr rkl i) \<le> rankr rkl (l!i)"
+  using parent_has_greater_rank[OF contextasm] unfolding rankr_def by auto
+
+\<comment>\<open>@{term index} is at least one\<close>
+
+lemma index_ge_1: "1\<le>index"
+  unfolding index_def
+  \<comment>\<open> By definition of @{term index}, we must show that applying @{term "Ackermann prek"} once
+     to @{term "rankr rkl i"} takes us below or at @{term "rankr rkl (l!i)"}.\<close>
+  apply (rule inn.\<beta>\<^sub>f_spec_reciprocal[of 1 "(rankr rkl (l ! i))"])
+  apply simp
+  apply (subst defk_def[symmetric])
+  apply (rule lnn.\<beta>\<^sub>f_spec_direct[of "rankr rkl (l ! i)" prek])
+  unfolding defk_def prek_def by (auto simp: level_exists)
+
+\<comment>\<open>@{term index}  is at most @{term "rankr rkl i"}.\<close>
+
+lemma index_le_rank: "index \<le> rankr rkl i"
+  unfolding index_def
+  apply (rule inn.\<beta>\<^sub>f_spec_direct_contrapositive_le[of "(rankr rkl (l ! i))" "rankr rkl i"])
+  subgoal apply simp using parent_has_greater_rank[OF contextasm] unfolding rankr_def by fastforce
+  subgoal apply (rule order.strict_trans2) apply (subst rankr_parent_i_lt)
+  subgoal ..
+  unfolding level_def apply (subst Ackermann_step_eq) by simp
+  done
 
 end
 
-definition \<phi> where "\<phi> l rkl x \<equiv> if rep_of l x = x
-                    then \<alpha>\<^sub>r (rankr rkl x) * Suc (\<alpha>\<^sub>r (rankr rkl x))    
-                    else (if \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x)) 
-                        then (\<alpha>\<^sub>r (rankr rkl x) - level l rkl x) * (rankr rkl x) - index l rkl x + 1
+
+section{*Potential function \<Phi> of the whole Union Find data structure*}
+
+definition \<phi> where "\<phi> l rkl i \<equiv> if  l!i = i
+                    then \<alpha>\<^sub>r (rankr rkl i) * Suc (rankr rkl i)
+                    else (if \<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i)) 
+                        then (\<alpha>\<^sub>r (rankr rkl i) - level l rkl i) * (rankr rkl i) - index l rkl i + 1
                         else 0)"
 
-definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> x a.  (\<phi> l rkl x) + a) (0::nat) (Domain (ufa_\<alpha> l))"
+definition \<Phi> where "\<Phi> l rkl \<equiv> Finite_Set.fold (\<lambda> i a.  (\<phi> l rkl i) + a) (0::nat) (Domain (ufa_\<alpha> l))"
+
+lemma \<Phi>_simp[simp]: "\<Phi> l rkl = sum (\<lambda> i. \<phi> l rkl i) {0..<length l}"
+proof -
+  have 1: "(\<lambda>i. (+) (\<phi> l rkl i)) = (((+) \<circ>\<circ>\<circ> \<phi>) l rkl)" by auto
+  show ?thesis
+    unfolding \<Phi>_def
+    apply simp
+    apply (subst 1)
+    using  Groups_Big.comm_monoid_add_class.sum.eq_fold[of "\<lambda>i. \<phi> l rkl i" "{0..<length l}", symmetric] .
+qed
+
+\<comment>\<open>The following lemmas repeat the cases of the definition of \<phi>\<close>
+
+lemma \<phi>_case_1:
+  assumes "l!i=i"
+  shows "\<phi> l rkl i = \<alpha>\<^sub>r (rankr rkl i) * Suc (rankr rkl i)"
+  unfolding \<phi>_def using assms by (simp cong: if_cong)
+
+lemma \<phi>_case_2:
+  assumes "l!i\<noteq>i" "\<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "\<phi> l rkl i = (\<alpha>\<^sub>r (rankr rkl i) - level l rkl i) * (rankr rkl i) - index l rkl i + 1"
+  unfolding \<phi>_def using assms by (simp cong: if_cong)
+
+lemma \<phi>_case_3:
+  assumes "l!i\<noteq>i" "\<alpha>\<^sub>r (rankr rkl i) \<noteq> \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "\<phi> l rkl i = 0"
+  unfolding \<phi>_def using assms by (simp cong: if_cong)
+
+\<comment>\<open>This lemma unifies the last two cases above.\<close>
+
+lemma \<phi>_case_2_or_3:
+  assumes "l!i\<noteq>i"
+  shows "\<phi> l rkl i \<le> (\<alpha>\<^sub>r (rankr rkl i) - level l rkl i) * (rankr rkl i) - index l rkl i + 1"
+  apply (cases "\<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i))")
+  subgoal using assms by (simp add: \<phi>_case_2)
+  subgoal using assms by (simp add: \<phi>_case_3)
+  done
+
+\<comment>\<open> In case 2 above, the subtractions are safe: they cannot produce a
+   negative number. The first subtraction always produces at least 1,
+   while the second subtraction always produces at least 0. \<close>
+
+lemma \<phi>_case_2_safe_level:
+  assumes "invar_rank l rkl" "i<length l" "l!i\<noteq>i"  "\<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "level l rkl i < \<alpha>\<^sub>r (rankr rkl i)"
+  using assms level_lt_\<alpha>\<^sub>r[OF assms(1-3)] by argo
+
+\<comment>\<open> We note that the equality hypothesis on the ranks is required.
+   Indeed, in case 3, we could have @{term "level l rkl i = \<alpha>\<^sub>r (rankr rkl i)"}. \<close>
+
+lemma \<phi>_case_2_safe_index:
+  assumes "invar_rank l rkl" "i<length l" "l!i\<noteq>i"  "\<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "index l rkl i \<le> (\<alpha>\<^sub>r (rankr rkl i) - level l rkl i) * (rankr rkl i)"
+  apply (rule order.trans[OF index_le_rank[OF assms(1-3)]])
+  apply simp using rankr_positive[of rkl i] using \<phi>_case_2_safe_level[OF assms] by linarith
+
+\<comment>\<open> In case 1 above, [phi x] is at least 1. (Page 18.) \<close>
+\<comment>\<open> This property seems unused, so we do not name it. \<close>
+
+lemma assumes "l!i=i" shows "1 \<le> \<phi> l rkl i"
+proof -
+  { fix z::nat have "1\<le>z \<longleftrightarrow> 0<z" by fastforce } note alt = this
+  show ?thesis
+    apply (subst \<phi>_case_1[OF assms])
+    apply (subst alt)
+    apply (rule mult_pos_pos)
+     apply (simp add: alphar_pos[OF \<rho>_gt_0]) 
+    by simp
+qed
+
+
+\<comment>\<open> In case 2 above, @{term "\<phi> l rkl i"} is at least 1. (Page 18) \<close>
+
+lemma \<phi>_case_2_lower_bound:
+  assumes "invar_rank l rkl" "i<length l" "l!i\<noteq>i"  "\<alpha>\<^sub>r (rankr rkl i) = \<alpha>\<^sub>r (rankr rkl (l!i))"
+  shows "1 \<le> \<phi> l rkl i"
+  apply (subst \<phi>_case_2[OF assms(3,4)])
+  using \<phi>_case_2_safe_index[OF assms]
+  by presburger
+
+\<comment>\<open> Alstrup et al. write, on page, 18, "if x is a nonroot leaf, then rankr (x) = \<rho>".
+   This appears to be false: in the presence of path compression, a nonroot leaf
+   can have nonzero rank. (Imagine it used to be a root with nonzero rank and (as
+   per the numerous family condition) many descendants; but these descendants were
+   removed by path compression.) Thus, we are unable to conclude that phi x = 0.
+   This does not seem to be a problem: this remark in not exploited anywhere. \<close>
+
+\<comment>\<open> An upper bound on @{term "\<phi> l rkl i"}. In any case, @{term "\<phi> l rkl i"}
+   is at most the formula that appears in case 1. \<close>
+
+lemma \<phi>_upper_bound:
+ "\<phi> l rkl i \<le> \<alpha>\<^sub>r (rankr rkl i) * Suc (rankr rkl i)"
+  unfolding \<phi>_def
+  apply (simp cong: if_cong) apply safe proof goal_cases
+  case 1
+  let ?n = "\<alpha>\<^sub>r (rankr rkl i)"
+  have "0 < ?n" by (simp add: \<rho>_gt_0 alphar_pos)
+  have gener: "Suc ((?n - level l rkl i) * rankr rkl i) \<le> ?n + ?n * rankr rkl i"  
+    using \<open>0 < ?n\<close> by (auto simp: algebra_simps)
+  have "rankr rkl i - index l rkl i \<le> rankr rkl i" by simp
+  with gener 1 show ?case by fastforce
+qed
+
+
+section{*Lemmas about \<Phi>, i.e. about the whole Union Find data structure*}
+
+lemma \<Phi>_empty:
+  "\<Phi> [] [] = 0"
+  by simp
+
+\<comment>\<open> If @{term i} is a root and has zero rank, then @{term "\<phi> l rkl i = \<rho> + 1"}\<close>
+
+lemma \<phi>_root_zero_rank:
+  assumes "invar_rank l rkl" "i < length l" "l!i=i" "rkl!i=0"
+  shows "\<phi> l rkl i = Suc \<rho>"
+proof -
+  have f: "rankr rkl i = \<rho>" unfolding rankr_def using \<open>rkl!i=0\<close> by simp
+  show ?thesis  
+    apply (subst \<phi>_case_1[OF \<open>l!i=i\<close>])
+    apply (subst f)+
+    apply (subst alphar_r[OF \<rho>_gt_0]) by simp
+qed
+
+\<comment>\<open>The next lemma in Coq (\<Phi>_extend) doesn't apply to our model with a fixed domain\<close>
 
 
 
-
-
-
-
-
-
-
-lemma level_to_alpha: 
-  assumes "ufa_invar l" 
-  shows "1\<le> level l rkl i"
-        "level l rkl i < \<alpha>\<^sub>r (rankr rkl (l!i))"
-  using assms  unfolding level_def rankr_def alphar_def ufa_invar_def
-  apply simp
-  apply auto
-  sorry
-
-
-term ufa_invar
-
-
-
-thm invar_sli_le_l
 lemma invar_rank_sli_le_l:
   assumes "invar_rank l rkl" "ufa_invar l" "i<length l"
   shows "rkl ! (rep_of l i) \<le> length l"
@@ -1148,23 +1310,10 @@ proof -
 qed
 
 
-
-lemma \<Phi>_simp[simp]: "\<Phi> l rkl = sum (\<lambda> x. \<phi> l rkl x) {0..<length l}"
-proof -
-  have 1: "(\<lambda>x. (+) (\<phi> l rkl x)) = (((+) \<circ>\<circ>\<circ> \<phi>) l rkl)" by auto
-  show ?thesis
-    unfolding \<Phi>_def
-    apply simp
-    apply (subst 1)
-    using  Groups_Big.comm_monoid_add_class.sum.eq_fold[of "\<lambda>x. \<phi> l rkl x" "{0..<length l}", symmetric] .
-qed
-  
-
-
-thm ufa_compress_correct
 lemma amortized_cost_compress:
   assumes "ufa_invar l"
- shows "\<Phi> l rkl + 2* (\<alpha> (card (Domain (ufa_\<alpha> l)))) + 4 \<ge> \<Phi> (l[x := rep_of l x]) rkl + d + 1"
+  shows "\<Phi> l rkl + 2* (\<alpha>\<^sub>r (card (Domain (ufa_\<alpha> l)))) + 4 \<ge> \<Phi> (l[x := rep_of l x]) rkl + d + 1"
+  apply (subst ufa_\<alpha>_dom_card)
   sorry
 
 end
