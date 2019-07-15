@@ -711,6 +711,80 @@ proof goal_cases
   then show ?case unfolding ufa_\<beta>_def by (simp add: trans_rtrancl)
 qed
 
+lemma ufa_\<beta>_start_functional:
+  assumes "ufa_invar l" "i< length l" "j < length l" "i'<length l"
+          "(i,j)\<in> ufa_\<beta>_start l" "(i,i')\<in> ufa_\<beta>_start l"
+        shows "j = i'" 
+  using assms unfolding ufa_\<beta>_start_def by fast
+
+\<comment>\<open>If we are in a cycle and make one step, then we are still in a cycle.\<close>
+
+lemma one_step_in_a_cycle:
+  assumes "ufa_invar l" "i <length l" "j<length l" "i'<length l" "(i,j) \<in> ufa_\<beta> l" "i = j" "(i,i') \<in> ufa_\<beta>_start l"
+  shows "(i',i') \<in> ufa_\<beta> l"
+  using assms(5,1,2,3,4,6,7) unfolding ufa_\<beta>_def  
+proof (induction arbitrary: i'  rule: trancl_induct)
+  case (base y)
+  hence "y = i'" using ufa_\<beta>_start_functional by fast
+  then show ?case using base by blast
+next
+  case (step y z)
+  have "(y,i) \<in> ufa_\<beta>_start l" using step by argo
+  have "(y, y) \<in> (ufa_\<beta>_start l)\<^sup>+" using step(1) \<open>(y, i) \<in> ufa_\<beta>_start l\<close> by auto
+  have "(i',y) \<in> (ufa_\<beta>_start l)\<^sup>+ \<or> i'=y" using step(1) step(9) apply safe unfolding ufa_\<beta>_start_def 
+    using converse_tranclE  by force
+  thus ?case using step \<open>(y, y) \<in> (ufa_\<beta>_start l)\<^sup>+\<close> by fastforce 
+qed
+
+\<comment>\<open>Thus, a path cannot leave a cycle.\<close>
+
+lemma cannot_escape_a_cycle:
+  assumes "ufa_invar l" "i <length l" "j<length l" "(i,i) \<in> ufa_\<beta> l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "(j,j) \<in> ufa_\<beta> l"
+  using assms(5,1-4) unfolding ufa_\<beta>_def thm converse_trancl_induct[of i i] 
+proof (induction arbitrary: i rule: rtrancl_induct)
+  case base
+  then show ?case using assms  unfolding ufa_\<beta>_def by blast
+next
+  case (step y z)
+  hence "y<length l" unfolding ufa_\<beta>_start_def by blast
+  show ?case using one_step_in_a_cycle 
+      step(3)[OF \<open>ufa_invar l\<close> \<open>i<length l\<close> \<open>y<length l\<close> \<open>(i, i) \<in> (ufa_\<beta>_start l)\<^sup>+\<close>] 
+      step(1,2) step(4-7) unfolding ufa_\<beta>_def ufa_\<beta>_start_def by blast
+qed
+
+\<comment>\<open>Thus, the fact every vertex has a representative contradicts the
+   existence of a cycle.\<close>
+
+lemma aciclicity:
+  assumes "ufa_invar l" "i<length l" "(i,i) \<in> ufa_\<beta> l"
+  shows "False"
+proof -
+  let ?z = "rep_of l i"
+  have sg0: "(i,?z)\<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_ufa_\<beta>_refl[OF assms(1,2)] .
+  have sg1: "?z=l!?z" by (simp add: assms(1,2) rep_of_min)
+  have sg1': "?z<length l" by (simp add: assms(1,2) rep_of_bound)
+  have sgz: "(?z,?z) \<in> ufa_\<beta> l" using cannot_escape_a_cycle sg1 sg1' sg0 assms by blast
+  thus ?thesis using sg0 sg1 sg1' sgz assms unfolding ufa_\<beta>_def ufa_\<beta>_start_def
+    using tranclD by fast
+qed
+  
+\<comment>\<open>If there is a non-empty path from i to j, then i and j must be distinct.\<close>
+
+lemma paths_have_distinct_endpoints:
+  assumes "ufa_invar l" "i<length l" "j<length l" "(i,j) \<in> ufa_\<beta> l"
+  shows "i \<noteq> j"
+proof (rule ccontr)
+  assume "\<not>i\<noteq>j" hence "i = j" by simp
+  thus "False" using aciclicity assms by fast
+qed
+
+\<comment>\<open>If there is an edge from i to j, then i and j must be distinct.\<close>
+
+lemma edges_have_distinct_endpoints:
+  assumes "ufa_invar l" "i<length l" "j<length l" "(i,j) \<in> ufa_\<beta>_start l"
+  shows "i\<noteq>j"
+  using assms unfolding ufa_\<beta>_start_def by blast
 
 subsubsection{*Closures with distances*}
 
@@ -1075,11 +1149,14 @@ begin
 
 definition defk where "defk k \<equiv> Ackermann k (rankr rkl i)"
 
-interpretation lnn: f_nat_nat "defk"
+lemma lnn_f_nat_nat: "f_nat_nat defk"
   apply standard subgoal using Ackermann_strict_mono_in_k rankr_positive unfolding defk_def by blast
   subgoal using Ackermann_k_x_tends_to_infinity_along_k rankr_positive unfolding defk_def by blast
   done
 
+
+interpretation lnn: f_nat_nat "defk" using lnn_f_nat_nat .
+  
 definition prek where "prek \<equiv> lnn.\<beta>\<^sub>f (rankr rkl (l!i))"
 
 definition level where "level \<equiv> Suc prek"
@@ -1145,7 +1222,7 @@ section{*Index: Definition and Lemmas*}
   iterations of @{term "Ackermann prek"} take us from @{term "rankr rkl i"} 
   to at most @{term "rankr rkl (l!i)"}. \<close>
 
-interpretation inn: f_nat_nat "\<lambda>j. compow j (Ackermann prek) (rankr rkl i)"
+lemma inn_f_nat_nat: "f_nat_nat (\<lambda>j. compow j (Ackermann prek) (rankr rkl i))"
 proof (standard, goal_cases)
   case 1
   { fix x::nat and y::nat assume lt:"x<y"
@@ -1159,6 +1236,9 @@ next
   case 2
   then show ?case using compow_i_Ackermann_tends_to_infinity_along_i[of prek "(rankr rkl i)"] .
 qed 
+
+interpretation inn: f_nat_nat "\<lambda>j. compow j (Ackermann prek) (rankr rkl i)" 
+  using inn_f_nat_nat .
 
 definition index where "index \<equiv> inn.\<beta>\<^sub>f (rankr rkl (l!i))"
 \<comment>\<open>If that sounds crazy, it is\<close>
@@ -1335,6 +1415,155 @@ proof -
 qed
 
 \<comment>\<open>The next lemma in Coq (\<Phi>_extend) doesn't apply to our model with a fixed domain\<close>
+
+
+section{*Lemmas about parents during ufa_union and compression (UnionFind22ParentEvolution)*}
+
+\<comment>\<open>During a union, a vertex v which already has a parent keeps this parent.\<close>
+
+lemma ufa_union_preserves_parent:
+  assumes "ufa_invar l" "x<length l" "y<length l" "v<length l" "x=l!x" "v\<noteq>l!v"
+  shows "l!v = (ufa_union l x y)!v"
+proof (cases "v\<noteq>x")
+  case True
+    then show ?thesis using assms by (simp add: rep_of_refl)
+  next
+  case False
+    then show ?thesis using assms by fast
+  qed
+
+
+\<comment>\<open>After a link, the parent of x is y. Yes, but we don't have the link operation, only union\<close>
+
+lemma ufa_union_sets_parent:
+  assumes "ufa_invar l" "x<length l" "y<length l" "x=l!x"
+  shows "(ufa_union l x y)!x = rep_of l y"
+proof -
+  have "rep_of l x = x" using assms using rep_of_refl by auto
+  hence "rep_of (ufa_union l x y) x = rep_of l y" using  assms(1-3) rep_of_refl ufa_union_aux by fastforce
+  thus ?thesis using assms  \<open>rep_of l x = x\<close> by auto
+qed
+
+
+section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
+
+\<comment>\<open>During a compression, the level function is unchanged at ancestors of y\<close>
+
+\<comment>\<open>This would be compress_preserves_k_above_y, again this does not apply as we compress differently\<close>
+
+
+\<comment>\<open> Assume x and y are non-roots. (This is required for their level and index
+   to be defined.) Assume that there is a non-trivial path from x to y.
+   Finally, assume that x and y have the same level, i.e., @{term "level l rkl x = level l rkl y"}.
+   Then, @{term "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"}. 
+   This is part of the proof of Lemma 4.10 in Alstrup et al.'s paper. \<close>
+
+lemma levelx_levely:
+  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
+  shows "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"
+proof -
+  have pp: "prek l rkl x = prek l rkl y" using level_def assms by simp
+  \<comment>\<open> Because there is a path from the parent of x to y, the rank of y
+     is at least the rank of the parent of x. \<close>
+  have "l!x<length l" using assms(1,2) unfolding invar_rank_def ufa_invar_def by blast
+  hence hxy: "rankr rkl (l!x) \<le> rankr rkl y"
+    using  assms rankr_increases_along_path_refl by blast
+  \<comment>\<open> By definition of @{term "index l rkl"}, iterating @{term "index l rkl x"} times 
+    @{term "Ackermann (prek l rkl x)"}, starting from @{term "rankr rkl x"}, takes us at most to 
+     @{term "rankr rkl (l!x)"}. \<close>
+  have hx: "compow (index l rkl x) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!x)"
+    unfolding index_def[OF assms(1,2) assms(4)[symmetric]] 
+    apply (rule f_nat_nat.f_\<beta>\<^sub>f[OF inn_f_nat_nat, OF assms(1) assms(2) assms(4)[symmetric], of "rankr rkl (l ! x)"])
+    apply simp
+    using assms(1,2) parent_has_greater_rankr by fastforce
+  (* By definition of [prek], applying [A (prek x)] to [rankr y] takes us
+     at least to [rankr (p y)]. *)
+  have hy': "Ackermann 0 (rankr rkl y) \<le> rankr rkl (l ! y)" apply (subst Ackermann_base_eq) unfolding rankr_def 
+    using assms(1,3,5) parent_has_greater_rank by fastforce
+  have hy: "Ackermann (prek l rkl x) (rankr rkl y) \<le> rankr rkl (l!y)"
+    apply (subst pp)
+    using f_nat_nat.\<beta>\<^sub>f_spec_direct[OF lnn_f_nat_nat, OF assms(1) assms(3) assms(5)[symmetric], of "rankr rkl (l ! y)" "(prek l rkl y)"] unfolding defk_def[OF assms(1) assms(3) assms(5)[symmetric]] sorry
+  show ?thesis apply simp using hx hxy hy sorry
+qed
+
+
+\<comment>\<open>Under the same assumptions as the previous lemma, if one preforms path compression on x then
+  either @{term "rankr rkl x"} changes (which means it increases, really, but we have not proved 
+  that), or @{term "index l rkl x"} increases\<close>
+
+lemma levelx_levely_compress:
+  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
+          "z = rep_of l x" "level l rkl x = level (l[x:= rep_of l x]) rkl x"
+  shows "Suc (index l rkl x) \<le> index (l[x:= rep_of l x]) rkl x"
+proof -
+  have pyz: "z = rep_of l (l!y)" using assms
+    by (metis (no_types, hide_lams) invar_rank_def rep_of_bound rep_of_idx rep_of_invar_along_path ufa_invarD(2))
+  have rpyz: "rankr rkl (l!y) \<le> rankr rkl z"
+    by (metis (no_types, lifting) assms(1) assms(3) eq_iff invar_rank_def pyz rankr_increases_along_path_refl rep_of_bound rep_of_ufa_\<beta>_refl ufa_invarD(2))
+  note f = levelx_levely[OF assms(1-7)]
+  have rpyz': "(Ackermann (prek l rkl x) ^^ Suc (index l rkl x)) (rankr rkl x) \<le> rankr rkl z" using rpyz f by linarith
+  have prehkk: "prek l rkl x = prek (l[x:= rep_of l x]) rkl x" using assms(9) using level_def assms sorry
+  show ?thesis sorry
+qed
+
+
+
+section{*Notion of state evolution over time (UnionFind13RankLink, UnionFind23Evolution)*}
+
+
+subsubsection{*UnionFind13RankLink*}
+definition union_by_rank_l where "union_by_rank_l l rkl x y \<equiv> if (rkl!x < rkl!y) 
+                                  then (ufa_union l x y) else (ufa_union l y x)"
+
+definition union_by_rank_rkl where "union_by_rank_rkl rkl x y \<equiv> if (rkl!x = rkl!y) 
+                                    then rkl[x := Suc (rkl!x)] else rkl"
+
+lemma link_cannot_decrease_rank:
+  "rkl!v \<le> (union_by_rank_rkl rkl x y)!v"
+  unfolding union_by_rank_rkl_def 
+  apply (cases "rkl!x=rkl!y")
+  apply (simp cong: if_cong) 
+   apply (metis eq_iff lessI less_imp_le_nat nth_list_update_eq nth_list_update_neq nth_update_invalid)
+  by (simp cong: if_cong)
+
+lemma link_preserves_rank_of_non_roots:
+  assumes "x<length l" "y<length l" "v<length l" 
+  shows "rkl!v \<le> (union_by_rank_rkl rkl x y)!v"
+  sorry
+
+lemma invar_rank_link:
+  assumes "invar_rank l rkl" "x < length l" "y < length l" "x=l!x" "y=l!y" "x\<noteq>y"
+  shows "invar_rank (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
+  sorry
+
+
+\<comment>\<open>This is only an application of @{thm ufa_union_correct}\<close>
+lemma dsf_per_add_edge_by_rank: "False" oops 
+
+\<comment>\<open>The second part of UnionFind13RankLink seems to specific to be needed, but maybe it
+is useful to have some explicit lemmas about rep_of under union_by_rank\<close>
+
+
+subsection{*UnionFind23Evolution*}
+inductive evolution 
+  for l::"nat list" and rkl::"nat list" and x::"nat" and y::"nat"
+  where 
+  EvUnion: "x<length l \<Longrightarrow> y<length l \<Longrightarrow> x=l!x \<Longrightarrow> y=l!y \<Longrightarrow> x\<noteq>y 
+          \<Longrightarrow> evolution l rkl (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
+| EvCompress: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow>  evolution l rkl (l[x:= rep_of l y]) rkl"
+
+
+
+
+
+
+
+section{*Evolution of level, index and potential over time (UnionFind43PotentialAnalysis)*}
+
+
+
+
+
 
 
 
