@@ -1469,7 +1469,7 @@ proof -
   hence hxy: "rankr rkl (l!x) \<le> rankr rkl y"
     using  assms rankr_increases_along_path_refl by blast
   \<comment>\<open> By definition of @{term "index l rkl"}, iterating @{term "index l rkl x"} times 
-    @{term "Ackermann (prek l rkl x)"}, starting from @{term "rankr rkl x"}, takes us at most to 
+    @{term "Ackermann (prek l rkl x)"}, starting from @{term "rankr rkl x"}, takes us at most to c
      @{term "rankr rkl (l!x)"}. \<close>
   have hx: "compow (index l rkl x) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!x)"
     unfolding index_def[OF assms(1,2) assms(4)[symmetric]] 
@@ -1545,23 +1545,481 @@ is useful to have some explicit lemmas about rep_of under union_by_rank\<close>
 
 
 subsection{*UnionFind23Evolution*}
-inductive evolution 
-  for l::"nat list" and rkl::"nat list" and x::"nat" and y::"nat"
+
+inductive evolution
+for l::"nat list" and rkl::"nat list"
   where 
   EvUnion: "x<length l \<Longrightarrow> y<length l \<Longrightarrow> x=l!x \<Longrightarrow> y=l!y \<Longrightarrow> x\<noteq>y 
           \<Longrightarrow> evolution l rkl (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
 | EvCompress: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow>  evolution l rkl (l[x:= rep_of l y]) rkl"
 
 
+lemma compress_evolution:
+  assumes "invar_rank l rkl" "x<length l" "x\<noteq>l!x" 
+  shows "evolution l rkl (l[x:= rep_of l x]) rkl"
+  sorry
+
+context \<comment>\<open>StudyOfEvolution\<close>
+  fixes l::"nat list" and rkl::"nat list" and l'::"nat list" and rkl'::"nat list"
+  assumes contextasm: "invar_rank l rkl" "evolution l rkl l' rkl'"
+begin
+
+lemma invar_rank_evolution: "invar_rank l' rkl'"
+  sorry
 
 
+lemma rank_grows: "rkl!v \<le> rkl'!v"
+  sorry
+
+lemma non_root_has_constant_rank:
+  assumes "v\<noteq>l!v"
+  shows "rkl!v = rkl'!v"
+  sorry
+
+
+lemma non_root_forever:
+  assumes "v\<noteq>l!v"
+  shows "v\<noteq>l'!v"
+  sorry
+
+\<comment>\<open>The quantity @{term "rkl!(l!v)"} grows with time, either because the rank of the parent of v
+  changes (during a union), or because the parent of v changes (during compression).\<close>
+
+lemma rank_parent_grows:
+  assumes "v\<noteq>l!v"
+  shows "rkl!(l!v) \<le> rkl'!(l'!v)"
+  sorry
+
+end  \<comment>\<open>StudyOfEvolution\<close>
 
 
 
 section{*Evolution of level, index and potential over time (UnionFind43PotentialAnalysis)*}
 
+context \<comment>\<open>StudyOfEvolution\<close>
+  fixes l::"nat list" and rkl::"nat list" and l'::"nat list" and rkl'::"nat list"
+  assumes contextasm: "invar_rank l rkl" "evolution l rkl l' rkl'"
+begin
 
 
+context \<comment>\<open>NonRoot\<close>
+  fixes v::nat
+  assumes v_has_a_parent: "v\<noteq>l!v"
+begin
+
+lemma non_root_has_constant_rankr:
+  "rankr rkl v = rankr rkl' v"
+  using \<rho>_gt_0 non_root_has_constant_rank[OF contextasm v_has_a_parent] unfolding rankr_def by simp
+
+lemma rankr_parent_grows:
+  "rankr rkl (l!v) \<le> rankr rkl' (l'!v)"
+  using \<rho>_gt_0 rank_parent_grows[OF contextasm v_has_a_parent]  unfolding rankr_def by simp
+
+
+\<comment>\<open>Because @{term "rankr rkl v"} is constant while @{term "rankr rkl (l!v)"} may grow, 
+  @{term "level l rkl v"} can only grow\<close>
+
+lemma level_v_grows:
+  "level l rkl v \<le> level l' rkl' v"
+  sorry
+
+\<comment>\<open>As long as  @{term "level l rkl v"} remains constant, @{term "index l rkl v"} can only grow.\<close>
+
+lemma index_v_grows_if_level_v_constant:
+  assumes "level l rkl v = level l' rkl' v"
+  shows "index l rkl v \<le> index l' rkl' v"
+  sorry
+
+\<comment>\<open>The potential @{term "\<phi> l rkl v"} cannot increase. (Lemma 4.5 on pages 18-19)\<close>
+
+lemma \<phi>_cannot_increase_nonroot:
+  "\<phi> l' rkl' v \<le> \<phi> l rkl v"
+  sorry
+
+
+end \<comment>\<open>NonRoot\<close>
+
+
+\<comment>\<open>Let v be an arbitrary vertex (possibly a root). If its rank is preserved,
+   then its potential cannot increase.\<close>
+
+
+lemma \<phi>_v_cannot_increase:
+  assumes "rankr rkl v = rankr rkl' v"
+  shows "\<phi> l' rkl' v \<le> \<phi> l rkl v"
+proof (cases "v\<noteq>l!v")
+  case True
+  show ?thesis using \<phi>_cannot_increase_nonroot[OF True] .
+next
+  case False
+  hence is_root: "l!v = v" by presburger
+  show ?thesis
+    apply (subst \<phi>_case_1[OF is_root, of rkl]) 
+    apply(rule  \<phi>_upper_bound[of l' rkl' v] order.trans[OF \<phi>_upper_bound[of l' rkl' v], 
+                of "\<alpha>\<^sub>r (rankr rkl v) * Suc (rankr rkl v)"])
+    apply (subst assms)+
+    by blast
+qed
+
+end  \<comment>\<open>StudyOfEvolution\<close>
+
+
+\<comment>\<open>The increase of the potential \<Phi> during a link is at most 2. This is
+   Lemma 4.7 on page 19. The formal proof follows roughly the paper proof,
+   except we find it necessary to make certain case analyses explicit.\<close>
+
+lemma potential_increase_during_link_preliminary:
+  assumes "invar_rank l rkl" "x\<noteq>y" "x<length l" "y<length l" "x=l!x" "y=l!y" 
+  "(rkl!x < rkl!y \<and> rkl' = rkl) \<or> (rkl!x = rkl!y \<and> rkl'= rkl[y:= Suc (rkl!y)])"
+  "evolution l rkl (ufa_union l x y) rkl'"
+shows "\<Phi> (ufa_union l x y) rkl' \<le> \<Phi> l rkl + 2 "
+  sorry \<comment>\<open>:-)\<close>
+
+
+lemma potential_increase_during_link:
+  assumes "invar_rank l rkl" "x\<noteq>y" "x<length l" "y<length l" "x=l!x" "y=l!y"
+  "l' = union_by_rank_l l rkl x y" "rkl' = union_by_rank_rkl rkl x y"
+shows "\<Phi> l' rkl' \<le> \<Phi> l rkl + 2"
+proof -
+  have sg0: "evolution l rkl l' rkl'" using assms by (auto intro: evolution.intros)
+  show ?thesis 
+    apply (subst assms(7)) apply (subst assms(8))
+    unfolding union_by_rank_l_def union_by_rank_rkl_def
+    using potential_increase_during_link_preliminary[OF assms(1-6), of rkl' ] sg0 
+    apply (subst (asm) assms(7)) unfolding union_by_rank_l_def union_by_rank_rkl_def
+    by (smt assms(1,3,4,5,6,8) not_less_iff_gr_or_eq potential_increase_during_link_preliminary
+        union_by_rank_l_def union_by_rank_rkl_def)
+qed
+
+section{*Abstract definition of iterated path compression (UnionFind05IteratedCompression)*}
+
+\<comment>\<open> We now define an inductive predicate that encodes the process of performing
+   path compression iteratively along a path, up to the root. ipc stands for
+   "iterative path compression". The predicate @{term "ipc l x i l'"} means that in
+   the initial state l, performing path compression along the path that
+   begins at x leads in i steps to the final state l'. \<close>
+
+\<comment>\<open> We define backward and forward variants of this predicate, bw_ipc and
+   fw_ipc.
+
+   The forward variant corresponds intuitively to a two-pass algorithm, where
+   the first pass finds the representative z, and the second pass performs
+   iterated path compression. This formulation is clearly the sequential
+   composition of several path compression steps. For this reason, this
+   formulation is more amenable to a simple proof of several lemmas (e.g.
+   amortized_cost_fw_ipc_preliminary and invar_rank_fw_ipc.
+
+   The backward variant corresponds intuitively to the one-pass, recursive
+   formulation of path compression, where path compression is performed as the
+   stack is unwound. This formulation is *not* clearly the sequential
+   composition of several path compression steps, because it is not obvious
+   a priori that the representative of x before compression is the
+   representative of x after compression.
+
+   Naturally, the two predicates are in fact equivalent. \<close>
+
+inductive bw_ipc
+  where
+  BWIPCBase: "x=l!x \<Longrightarrow> bw_ipc l x 0 l"
+| BWIPCStep: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> bw_ipc l y i l' \<Longrightarrow> bw_ipc l x (Suc i) (l'[x:= rep_of l' x])"
+
+inductive fw_ipc
+  where
+  FWIPCBase: "x=l!x \<Longrightarrow> fw_ipc l x 0 l"
+| FWIPCStep: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> fw_ipc (l[x:= rep_of l y]) y i l' \<Longrightarrow> fw_ipc l x (Suc i) l'"
+
+
+lemma ipc_defined:
+  assumes "ufa_invar l"
+  shows "\<exists> i l'. bw_ipc l x i l'"
+  sorry
+
+lemma bw_ipc_fw_ipc:
+  assumes "ufa_invar l" "bw_ipc l x i l'" 
+  shows "fw_ipc l x i l'"
+  sorry
+
+\<comment>\<open>One probably needs the lemmas of this file (equivalence of the two, properties about
+  single step compressions and the predicates) to proceed. But without developing the proofs,
+  the concrete required formulation is not yet clear.\<close>
+
+
+
+section{*Lemmas about pleasantness (UnionFind24Pleasant)*}
+
+\<comment>\<open> This section defines the notion of ``pleasantness'' -- the property of having
+   a proper non-root ancestor with the same level -- and establishes several
+   lemmas which establish an upper bound on the number of unpleasant vertices. \<close>
+
+\<comment>\<open> This reasoning is usually not explicitly carried out on paper, yet it is
+   quite lenghty and painful here. \<close>
+
+\<comment>\<open> We parameterize these definitions and lemmas over a predicate ok and a
+   level function, so that they work both for Tarjan's original proof and
+   for Alstrup et al.'s proof. \<close>
+
+locale Pleasant = \<comment>\<open>Pleasant\<close>
+  fixes ok::"nat list \<Rightarrow> nat list \<Rightarrow> nat \<Rightarrow> bool"
+    and level::"nat list \<Rightarrow> nat list \<Rightarrow> nat \<Rightarrow> nat" 
+begin
+
+
+context \<comment>\<open>FK\<close>
+  fixes l::"nat list"  and rkl::"nat list"
+assumes contextasm: "invar_rank l rkl" 
+begin
+
+\<comment>\<open> A non-root vertex @{term x} is pleasant if it is OK and if it has a proper non-root
+   ancestor @{term y} such that @{term x} and @{term y} have the same level, 
+   i.e., @{term "level l rkl x = level l rkl y"}. \<close>
+
+definition pleasant where "pleasant x \<equiv> ok l rkl x \<and> x\<noteq>l!x 
+    \<and> (\<exists>y. y\<noteq>l!y \<and> ((l!x),y) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> (level l rkl x = level l rkl y) )"
+
+lemma pleasant_non_root:
+  assumes "pleasant x" shows "x\<noteq>l!x"
+  using assms unfolding pleasant_def by fast
+
+definition unpleasant_ancestors where "unpleasant_ancestors x \<equiv> 
+                                       (ancestors l x) \<inter> {y. (\<not>pleasant y) \<and> y\<noteq>l!y}"
+
+definition displeasure where "displeasure x \<equiv> card (unpleasant_ancestors x)"
+
+lemma displeasure_of_root:
+  assumes "x=l!x"
+  shows "displeasure x = 0"
+  sorry
+
+lemma displeasure_parent_if_pleasant:
+  assumes "(x,y) \<in> ufa_\<beta>_start l" "pleasant x"
+  shows "displeasure x = displeasure y"
+  sorry
+
+lemma displeasure_parent_if_unpleasant:
+  assumes "(x,y) \<in> ufa_\<beta>_start l" "\<not>pleasant x"
+  shows "displeasure x = Suc (displeasure y)"
+  sorry
+
+lemma displeasure_parent:
+  assumes "(x,y) \<in> ufa_\<beta>_start l"
+  shows "displeasure x \<le> Suc (displeasure y)"
+proof (cases "pleasant x")
+  case True
+  then show ?thesis using displeasure_parent_if_pleasant assms by simp
+next
+  case False
+  then show ?thesis using displeasure_parent_if_unpleasant assms by simp
+qed
+
+
+context  \<comment>\<open>Actually, the assumptions about ok and level are only needed for this context\<close>
+  fixes bound::nat
+  assumes  ok_hereditary: "ok l rkl x \<Longrightarrow> (x,y) \<in> (ufa_\<beta>_start l) \<Longrightarrow> ok l rkl y"
+    and level_bounded: "ok l rkl x \<Longrightarrow> x\<noteq>l!x \<Longrightarrow> (level l rkl x) < bound "
+
+begin
+
+
+\<comment>\<open>Let us write levels for the cardinal of the image under @{term "level l rkl"} of the set
+   of the non-root ancestors of x. That is, levels is the number of distinct levels of the
+   non-root ancestors of x.\<close>
+
+definition levels where "levels x = card (level l rkl `(ancestors l x \<inter> {y. y\<noteq>l!y}))"
+
+\<comment>\<open>If the image of the function @{term "level l rkl"} is included in @{term "{0..<n}"},
+   then @{term "levels x"} is at most n.\<close>
+
+lemma bounded_levels:
+  assumes "ok l rkl x"
+  shows "levels x \<le> bound"
+  sorry
+  
+
+lemma levels_parent_if_pleasant:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)"
+  shows "levels y \<le> levels x"
+  sorry
+
+lemma levels_parent_if_unpleasant:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "\<not>pleasant x" "ok l rkl x"
+  shows "Suc (levels y) \<le> levels x"
+  sorry
+
+lemma bounded_displeasure_preliminary_1:
+  assumes "(x,z)\<in> (ufa_\<beta>_start l)" "z=l!z" "ok l rkl z" 
+  shows "displeasure x \<le> levels x"
+  sorry
+
+lemma bounded_displeasure_preliminary_2:
+  assumes "ok l rkl x"
+  shows "displeasure x \<le> bound"
+  sorry
+
+\<comment>\<open> As an ad hoc corollary, if every non-root non-OK vertex has an OK parent,
+   then we obtain the following bound. This is useful in the special case
+   where OK is defined as "non-zero-rank". \<close>
+
+lemma bounded_displeasure:
+  \<comment>\<open>TODO: rewrite this in a sensible way\<close>
+  assumes "\<forall>x y. l!x\<noteq>x \<longrightarrow> \<not>ok l rkl x \<longrightarrow> (x,y)\<in> (ufa_\<beta>_start l) \<longrightarrow> ok l rkl y" 
+  shows "displeasure x \<le> Suc bound"
+  sorry
+
+end \<comment>\<open>Until here the assumtions about ok and level\<close>
+
+end \<comment>\<open>FK\<close>
+
+context \<comment>\<open>Preservation\<close>
+  assumes compress_preserves_level_above_y:
+    "\<lbrakk>(x,y)\<in> (ufa_\<beta>_start l); (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v\<rbrakk> \<Longrightarrow> level (l[x:= rep_of l y]) rkl v = level l rkl v"
+ and compress_preserves_ok_above_y:
+    "\<lbrakk>(x,y)\<in> (ufa_\<beta>_start l); (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> \<Longrightarrow> ok (l[x:= rep_of l y]) rkl v"
+begin
+
+lemma compress_preserves_pleasant_above_y:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,v)\<in> (ufa_\<beta>_start l)\<^sup>*" "pleasant l rkl v"
+  shows "pleasant (l[x:= rep_of l y]) rkl v"
+  sorry
+
+lemma compress_preserves_displeasure_of_y:
+  assumes "(x,y) \<in> (ufa_\<beta>_start l)" 
+  shows "displeasure (l[x:= rep_of l y]) rkl y \<le> displeasure l rkl y "
+  sorry
+
+end \<comment>\<open>Preservation\<close>
+
+end \<comment>\<open>Pleasant\<close>
+
+
+
+\<comment>\<open>The predicate top_part corresponds to the "top part of the path"
+   mentioned in the proof of Lemma 4.11.\<close>
+definition top_part where "top_part l rkl x \<equiv> \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+
+context \<comment>\<open>invar_rank\<close>
+  fixes l::"nat list" and rkl::"nat list"
+  assumes "invar_rank l rkl"
+begin
+
+interpretation pl: Pleasant top_part level .
+
+
+lemma top_part_hereditary:
+  assumes  "top_part l rkl x" "(x,y)\<in>(ufa_\<beta>_start l)"
+  shows "top_part l rkl y"
+    \<comment>\<open>rep_of l x = rep_of l y and 1(1) together with rank increasing along edges should suffice\<close>
+  sorry
+
+
+lemma compress_preserves_top_part_above_y:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "top_part l rkl v"
+  shows "top_part (l[x:=rep_of l y]) rkl v"
+  sorry
+
+
+\<comment>\<open>The proof of Lemma 4.11 says this is a strict inequality. This is
+   true. Here, we do not exploit the fact that a level is at least 1,
+   which is why we end up establishing a large inequality.\<close>
+
+lemma bounded_displeasure_alstrup:
+  assumes "top_part l rkl x" 
+  shows "pl.displeasure l rkl x \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+  sorry
+
+\<comment>\<open>During a path compression step at x, the vertex x is the only one whose
+   potential changes. So, if the potential of x decreases, then the total
+   potential \<Phi> decreases as well.\<close>
+
+lemma from_\<phi>_to_\<Phi>:
+  assumes "x\<noteq>l!x" "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
+  shows "\<Phi> (l[x:= rep_of l x]) rkl < \<Phi> l rkl "
+  sorry
+
+lemma pleasant_\<phi>:
+  assumes "pl.pleasant l rkl x"
+  shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
+  sorry
+
+
+lemma arbitrary_\<Phi>:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)"
+  shows "\<Phi> (l[x:= rep_of l x]) rkl \<le> \<Phi> l rkl"
+  sorry
+
+
+
+\<comment>\<open>We now evaluate the amortized cost of path compression in the "top part" of the path. \<close>
+
+lemma amortized_cost_fw_ipc_top_part_inductive:
+  assumes "fw_ipc l x i l'" "top_part l rkl x"
+  shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + pl.displeasure l rkl x"
+  sorry
+
+lemma amortized_cost_fw_ipc_top_part:
+  assumes "fw_ipc l x i l'" "top_part l rkl x"
+  shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+  using amortized_cost_fw_ipc_top_part_inductive[OF assms] bounded_displeasure_alstrup[OF assms(2)] 
+  by linarith
+
+\<comment>\<open>Say x is "easy" if @{term "alphar \<circ> (rankr rkl)"} is NOT constant all the way from x
+   to its root z, but maps x and its parent to the same value. In this case,
+   a path compression step at x causes the potential of x to decrease. This
+   is Lemma 4.9 in Alstrup et al.'s paper.\<close>
+
+lemma easy_\<phi>:
+  assumes "x\<noteq>l!x" "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))" 
+  "\<alpha>\<^sub>r (rankr rkl (l!x)) < \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
+  sorry
+
+
+\<comment>\<open>The following result covers the so-called "bottom part" of the path.
+   It combines Lemma 4.8 and the "bottom part" of Lemma 4.10, and calls
+   the previous result @{thm amortized_cost_fw_ipc_top_part} when it reaches
+   the "top part" of the path.\<close>
+
+lemma amortized_cost_fw_ipc_bottom_part:
+  assumes "fw_ipc l x i l'"
+  shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + 2 * \<alpha>\<^sub>r (rankr rkl (rep_of l x)) - \<alpha>\<^sub>r (rankr rkl x)"
+  sorry
+
+lemma amortized_cost_fw_ipc:
+  assumes "fw_ipc l x i l'" 
+  shows "\<Phi> l' rkl + i < \<Phi> l rkl + 2 * \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+proof -
+  have sg1: "\<alpha>\<^sub>r (rankr rkl x) > 0" using alphar_pos[OF \<rho>_gt_0] by fast
+  have sg2: "\<alpha>\<^sub>r (rankr rkl (rep_of l x)) > 0" using alphar_pos[OF \<rho>_gt_0] by fast
+  show ?thesis using sg1 sg2 amortized_cost_fw_ipc_bottom_part[OF assms] by fastforce
+qed
+
+
+\<comment>\<open>This corollary combines @{thm ipc_defined}, @{thm amortized_cost_fw_ipc}, and
+   @{thm bw_ipc_fw_ipc}, so as to obtain the amortized cost of iterated path
+   compression, in a variant based on bw_ipc, and in a form where the ipc
+   predicate appears as part of the conclusion (not as a hypothesis).\<close>
+
+lemma amortized_cost_of_iterated_path_compression_local:
+  assumes "x < length l" 
+  shows "\<exists> i l'. bw_ipc l x i l' \<and> \<Phi> l' rkl + i < \<Phi> l rkl + 2 * \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+proof -
+  obtain i l' where h1: "bw_ipc l x i l'" using \<open>invar_rank l rkl\<close> unfolding invar_rank_def 
+    using ipc_defined by presburger
+  thus ?thesis using assms \<open>invar_rank l rkl\<close> amortized_cost_fw_ipc bw_ipc_fw_ipc 
+    unfolding invar_rank_def by fast
+qed
+
+\<comment>\<open> A simplified version, where we bound the rankr of @{term "rep_of l x"} by the length of l,
+   plus @{term "\<rho> - 1"}. \<close>
+
+lemma amortized_cost_of_iterated_path_compression_global:
+  assumes "x<length l" 
+  shows "\<exists> i l'. bw_ipc l x i l' \<and> \<Phi> l' rkl + i < \<Phi> l rkl + 2 * \<alpha>\<^sub>r (length l + (\<rho> - 1))"
+  sorry
+
+
+
+
+end \<comment>\<open>invar_rank\<close>
 
 
 
