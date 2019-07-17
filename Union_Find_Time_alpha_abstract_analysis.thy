@@ -680,6 +680,7 @@ lemma ufa_\<beta>_dom: " Domain (ufa_\<beta> l) \<subseteq> {0..<length l}"
   unfolding ufa_\<beta>_def ufa_\<beta>_start_def 
   apply (subst trancl_domain) by fastforce 
 
+
 lemma rep_of_ufa_\<beta>_refl: 
   assumes "ufa_invar l" "i <length l" 
   shows "(i,rep_of l i) \<in> (ufa_\<beta>_start l)\<^sup>* " 
@@ -835,10 +836,10 @@ qed
 
 
 definition descendants where 
-  "descendants l i = {j. (j,i)\<in> ufa_\<beta> l}"
+  "descendants l i = {j. (j,i)\<in> (ufa_\<beta>_start l)\<^sup>*}"
 
 definition ancestors where
-  "ancestors l i = {j. (i,j)\<in> ufa_\<beta> l}"
+  "ancestors l i = {j. (i,j)\<in> (ufa_\<beta>_start l)\<^sup>*}"
 
 definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
                             \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<and>  i\<noteq>j \<longrightarrow> rkl ! i < rkl ! j) 
@@ -906,66 +907,7 @@ lemma ancestor_has_greater_rank:
   assumes "invar_rank l rkl" "i < length l" "j < length l" "j \<in> ancestors l i"
   shows "rkl!i \<le> rkl!j"
   using assms(4) unfolding ancestors_def 
-  using rank_increases_strictly_along_path[OF assms(1-3)] by fastforce
-
-
-\<comment>\<open>Remember @{thm ufa_\<alpha>_dom}, 
-  @{term "i < length l"} is equivalent to @{term "i \<in> Domain (ufa_\<alpha> l)"}\<close>
-
-lemma rank_is_logarithmic:
-  assumes "invar_rank l rkl" "i < length l"
-  shows "rkl!i \<le> Discrete.log (length l)"
-proof -
-  { \<comment>\<open>First we prove this for roots\<close>
-    fix i
-    assume "i < length l" and is_root:"l!i=i"
-    have crad: "{j. (j, i) \<in> ufa_\<beta> l} \<subseteq> {0..<length l}" using ufa_\<beta>_dom by blast
-    have sg1: "card (descendants l i) \<le> length l" unfolding descendants_def using ufa_\<beta>_dom
-      using crad subset_eq_atLeast0_lessThan_card by blast
-    have "rkl!i \<le> Discrete.log (length l)"
-      apply (rule prove_le_log) using assms sg1 \<open>i < length l\<close> is_root unfolding invar_rank_def
-      by force
-  } note root = this
-  thus ?thesis proof (cases "l!i=i")
-    case False
-    obtain j where j_def:"j = rep_of l i" by simp
-    have "l!j = j" using rep_of_min[of l i] j_def assms unfolding invar_rank_def by argo
-    have "i \<noteq> rep_of l i" using False rep_of_iff[OF _ assms(2)] assms(1) \<open>l ! j = j\<close> j_def 
-      unfolding invar_rank_def by force 
-    have sg1: "(i,j) \<in> ufa_\<beta> l" using j_def rep_of_ufa_\<beta>[OF _ assms(2) \<open>i\<noteq>rep_of l i\<close>]  assms(1) 
-      unfolding invar_rank_def by fastforce
-    hence "j < length l" using assms unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
-      using j_def rep_of_bound by blast 
-    have "rkl!i < rkl!j" using rank_increases_strictly_along_path[OF assms \<open>j < length l\<close> _ sg1] 
-         \<open>i\<noteq>rep_of l i\<close> j_def by blast
-    then show ?thesis using root[OF \<open>j<length l\<close> \<open>l!j=j\<close>] by linarith
-  qed (simp add: root assms(2))
-qed
-
-\<comment>\<open>Really equivalent to @{thm height_of_ub}\<close>
-
-lemma height_is_logarithmic:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "kpath (ufa_\<beta>_start l) i j k" 
-  shows "k \<le> Discrete.log (length l)"
-proof -
-  have "k \<le> rkl!j" using rank_bounds_height[OF assms] .
-  also have "\<dots> \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms(1,3)] .
-  finally show ?thesis .
-qed
-
-
-lemma log_lt_n: "0 < n \<Longrightarrow> Discrete.log n < n"
-  by (induction rule: Discrete.log_induct) simp+
-
-
-lemma rank_is_linear: assumes "invar_rank l rkl" "i < length l" 
-  shows "rkl ! i < length l"
-proof -
-  have "0 < length l" using \<open>i < length l\<close> by simp
-  have "rkl ! i \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms] .
-  also have "\<dots> < length l" using log_lt_n[OF \<open>0<length l\<close>] .
-  finally show ?thesis .
-qed
+  using rank_increases_along_path_refl[OF assms(1-3)] by fastforce
 
 
 lemma \<rho>_leq_rankr: "\<rho> \<le> rankr rkl x"
@@ -1076,7 +1018,102 @@ proof -
 qed
 
 
+
+lemma descendant_of_root:
+  assumes "ufa_invar l" "r<length l"  "x<length l" "r=l!r" 
+  shows "x \<in> descendants l r \<longleftrightarrow> r = rep_of l x"
+  using rep_of_path_iff[OF \<open>ufa_invar l\<close> \<open>r<length l\<close> \<open>x<length l\<close>] 
+  unfolding descendants_def ufa_\<beta>_start_def using assms(4) by auto
+
+lemma descendants_subset_domain:
+  assumes "ufa_invar l" "x < length l"
+  shows "descendants l x \<subseteq> {0..<length l}"
+  using assms unfolding descendants_def proof (auto,goal_cases)
+  case (1 y)
+    then show ?case unfolding ufa_\<beta>_start_def using converse_rtranclE by force
+  qed
+
+
+lemma disjoint_descendants:
+  assumes "ufa_invar l" "x<length l" "y<length l" "x = l!x" "y = l!y" "x\<noteq>y"
+  shows "(descendants l x)\<inter>(descendants l y) = {}"
+proof (auto,goal_cases)
+  case (1 z)
+  have "z<length l" using 1(1) using descendants_subset_domain[OF assms(1,2)] by auto
+  have sg1: "x = rep_of l z" using 1 
+      descendant_of_root[OF \<open>ufa_invar l\<close> \<open>x<length l\<close> \<open>z<length l\<close> \<open>x=l!x\<close>] by blast
+  have sg2: "y = rep_of l z" using 1 
+      descendant_of_root[OF \<open>ufa_invar l\<close> \<open>y<length l\<close> \<open>z<length l\<close> \<open>y=l!y\<close>] by blast
+  show ?case using sg1 sg2 \<open>x\<noteq>y\<close> by blast
+qed
+
+
+
+\<comment>\<open>Remember @{thm ufa_\<alpha>_dom}, 
+  @{term "i < length l"} is equivalent to @{term "i \<in> Domain (ufa_\<alpha> l)"}\<close>
+
+lemma rank_is_logarithmic:
+  assumes "invar_rank l rkl" "i < length l"
+  shows "rkl!i \<le> Discrete.log (length l)"
+proof -
+  { \<comment>\<open>First we prove this for roots\<close>
+    fix i
+    assume "i < length l" and is_root:"l!i=i"
+    have crad: "{j. (j, i) \<in> ufa_\<beta> l} \<subseteq> {0..<length l}" using ufa_\<beta>_dom by blast
+    have sg1: "card (descendants l i) \<le> length l" 
+      using descendants_subset_domain[OF _ \<open>i<length l\<close>] assms(1) unfolding invar_rank_def 
+      by (simp add: subset_eq_atLeast0_lessThan_card)
+    have "rkl!i \<le> Discrete.log (length l)"
+      apply (rule prove_le_log) using assms sg1 \<open>i < length l\<close> is_root unfolding invar_rank_def
+      by force
+  } note root = this
+  thus ?thesis proof (cases "l!i=i")
+    case False
+    obtain j where j_def:"j = rep_of l i" by simp
+    have "l!j = j" using rep_of_min[of l i] j_def assms unfolding invar_rank_def by argo
+    have "i \<noteq> rep_of l i" using False rep_of_iff[OF _ assms(2)] assms(1) \<open>l ! j = j\<close> j_def 
+      unfolding invar_rank_def by force 
+    have sg1: "(i,j) \<in> ufa_\<beta> l" using j_def rep_of_ufa_\<beta>[OF _ assms(2) \<open>i\<noteq>rep_of l i\<close>]  assms(1) 
+      unfolding invar_rank_def by fastforce
+    hence "j < length l" using assms unfolding ufa_\<beta>_def ufa_\<beta>_start_def invar_rank_def
+      using j_def rep_of_bound by blast 
+    have "rkl!i < rkl!j" using rank_increases_strictly_along_path[OF assms \<open>j < length l\<close> _ sg1] 
+         \<open>i\<noteq>rep_of l i\<close> j_def by blast
+    then show ?thesis using root[OF \<open>j<length l\<close> \<open>l!j=j\<close>] by linarith
+  qed (simp add: root assms(2))
+qed
+
+\<comment>\<open>Really equivalent to @{thm height_of_ub}\<close>
+
+lemma height_is_logarithmic:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "kpath (ufa_\<beta>_start l) i j k" 
+  shows "k \<le> Discrete.log (length l)"
+proof -
+  have "k \<le> rkl!j" using rank_bounds_height[OF assms] .
+  also have "\<dots> \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms(1,3)] .
+  finally show ?thesis .
+qed
+
+
+lemma log_lt_n: "0 < n \<Longrightarrow> Discrete.log n < n"
+  by (induction rule: Discrete.log_induct) simp+
+
+
+lemma rank_is_linear: assumes "invar_rank l rkl" "i < length l" 
+  shows "rkl ! i < length l"
+proof -
+  have "0 < length l" using \<open>i < length l\<close> by simp
+  have "rkl ! i \<le> Discrete.log (length l)" using rank_is_logarithmic[OF assms] .
+  also have "\<dots> < length l" using log_lt_n[OF \<open>0<length l\<close>] .
+  finally show ?thesis .
+qed
+
+
+
+
+
 \<comment>\<open>Two vertices connected by a path must be equivalent. (UnionFind01Data)\<close>
+  
 lemma path_is_equiv:
   assumes "ufa_invar l" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
   shows "(i,j) \<in> ufa_\<alpha> l"
