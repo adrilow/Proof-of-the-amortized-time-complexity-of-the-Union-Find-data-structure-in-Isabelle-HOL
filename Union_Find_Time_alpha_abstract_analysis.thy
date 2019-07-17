@@ -2,11 +2,11 @@ theory Union_Find_Time_alpha_abstract_analysis
 
 imports 
   "../../SepLog_Automatic" 
-  "../../Refine_Imperative_HOL/Sepref_Additional" 
+  "../../Refine_Imperative_HOL/Refine_Automation" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
   \<comment>\<open>"SepLogicTime_RBTreeBasic.Asymptotics_1D"\<close>
-  UnionFind_Impl
+ (* UnionFind_Impl *)
   Ackermann
 begin
 
@@ -851,6 +851,9 @@ definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> lengt
 definition invar_rank' where "invar_rank' l rkl \<equiv> ufa_invar l \<and> invar_rank l rkl"
 
 subsection{*Lemmas About the rank from UnionFind11Rank, UnionFind21Parent and UnionFind41Potential*}
+
+lemma invar_rank_ufa_invarI: "invar_rank l rkl \<Longrightarrow> ufa_invar l" unfolding invar_rank_def by blast
+
 
 lemma parent_has_nonzero_rank: assumes "invar_rank l rkl" "l!i = j" "i < length l" "j < length l" "i\<noteq>j"
    shows "0<rkl!j"
@@ -1822,20 +1825,54 @@ definition unpleasant_ancestors where "unpleasant_ancestors x \<equiv>
 
 definition displeasure where "displeasure x \<equiv> card (unpleasant_ancestors x)"
 
+lemma ancestors_of_parent:
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)"
+  shows "ancestors l x = ancestors l y \<union> {x}"
+  unfolding ancestors_def proof( auto, goal_cases)
+  case (1 z)
+  then show ?case using assms unfolding ufa_\<beta>_start_def
+    using converse_rtranclE by force
+next
+  case (2 z)
+  then show ?case using assms unfolding ufa_\<beta>_start_def 
+    by (meson converse_rtrancl_into_rtrancl)
+qed
+
+lemma ancestors_of_root:
+  assumes "x=l!x"
+  shows "ancestors l x = {x}"
+  unfolding ancestors_def ufa_\<beta>_start_def using assms apply auto
+  using converse_rtranclE by force
+
+
 lemma displeasure_of_root:
   assumes "x=l!x"
   shows "displeasure x = 0"
-  sorry
+  unfolding displeasure_def unpleasant_ancestors_def 
+  apply (subst ancestors_of_root[OF assms])
+  using assms by auto
+  
 
 lemma displeasure_parent_if_pleasant:
   assumes "(x,y) \<in> ufa_\<beta>_start l" "pleasant x"
   shows "displeasure x = displeasure y"
-  sorry
+  unfolding displeasure_def unpleasant_ancestors_def
+  apply (subst ancestors_of_parent[OF assms(1)]) using assms
+  by auto
 
 lemma displeasure_parent_if_unpleasant:
   assumes "(x,y) \<in> ufa_\<beta>_start l" "\<not>pleasant x"
   shows "displeasure x = Suc (displeasure y)"
-  sorry
+  unfolding displeasure_def unpleasant_ancestors_def
+  apply (subst ancestors_of_parent[OF assms(1)]) using assms 
+proof goal_cases
+  case 1
+  have "x\<notin> ancestors l y" using assms unfolding ancestors_def 
+    by (metis (no_types, lifting) aciclicity case_prodD contextasm invar_rank_def
+        mem_Collect_eq trancl.intros(1) trancl_rtrancl_trancl ufa_\<beta>_def ufa_\<beta>_start_def)
+  then show ?case using 1 sorry
+qed
+  
 
 lemma displeasure_parent:
   assumes "(x,y) \<in> ufa_\<beta>_start l"

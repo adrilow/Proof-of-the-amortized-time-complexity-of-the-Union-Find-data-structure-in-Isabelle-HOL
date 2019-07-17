@@ -7,9 +7,8 @@ subsubsection{*uf_init_lemmas*}
 definition is_uf :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" where 
   "is_uf R u \<equiv> case u of (s,p) \<Rightarrow> 
   \<exists>\<^sub>Al rkl. p\<mapsto>\<^sub>al * s\<mapsto>\<^sub>arkl 
-    * \<up>(ufa_invar l \<and> ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
+    * \<up>(ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
     * $(\<Phi> l rkl)"
-
 
 
 lemma of_list_rule':
@@ -17,15 +16,17 @@ lemma of_list_rule':
   using of_list_rule[of "[0..<n]"] by auto 
 
 
-lemma uf_init_rank_simp: "{(x, y). x < length [0..<n] \<and> y < length [0..<n] \<and> [0..<n] ! x = y} 
-  = {(x,y). x < length [0..<n] \<and> y = x}"
+lemma uf_init_rank_simp': "{(x, y). x < length [0..<n] \<and> y < length [0..<n] \<and> x \<noteq> y \<and> [0..<n] ! x = y} 
+  = {(x,y). x < length [0..<n] \<and> y = x \<and> x\<noteq>y}"
   using nth_upt_zero by blast
 
+lemma uf_init_rank_simp: "{(x, y). x < length [0..<n] \<and> y < length [0..<n] \<and> x \<noteq> y \<and> [0..<n] ! x = y} = {}"
+  using uf_init_rank_simp' by blast
   
-lemma ufa_\<beta>_init_simp: "ufa_\<beta> [0..<n] = {(x, y). x < length [0..<n] \<and> y = x}\<^sup>+"
+lemma ufa_\<beta>_init_simp: "ufa_\<beta> [0..<n] = {}"
   unfolding ufa_\<beta>_def ufa_\<beta>_start_def 
   apply (subst uf_init_rank_simp)
-  by blast
+  by simp
 
 lemma ufa_\<beta>_init_simp': "trans  {(x, y). x < length [0..<n] \<and> y = x}"
    apply rule
@@ -35,30 +36,25 @@ lemma ufa_\<beta>_init_simp': "trans  {(x, y). x < length [0..<n] \<and> y = x}"
 lemma ufa_\<beta>_init_simp'':"{(x, y). x < length [0..<n] \<and> y = x} = {(x, y). x < length [0..<n] \<and> y = x}\<^sup>+"
   using Transitive_Closure.trancl_id[OF ufa_\<beta>_init_simp', of n, symmetric ] .
 
+lemma ufa_\<beta>_init_desc: "i<n \<Longrightarrow> descendants [0..<n] i = {i}" 
+  unfolding descendants_def ufa_\<beta>_start_def 
+  by auto (metis (no_types, lifting) case_prodE mem_Collect_eq nth_upt_zero rtrancl.cases upt_zero_length)
+
+
 lemma ufa_init_invar': "invar_rank [0..<n] (replicate n 0)"
   unfolding invar_rank_def apply auto 
   proof goal_cases
-  case (1 i)
-  have setsimp: "i<n \<Longrightarrow> {j. i = j \<and> j <n} = {i}" by blast
-   show ?case unfolding descendants_def 
-    apply (subst ufa_\<beta>_init_simp)
-     apply (subst ufa_\<beta>_init_simp''[symmetric])
-     apply auto
-     apply (subst setsimp)
-     subgoal using 1 .
-     apply (subst Groups_Big.card_eq_sum)
-     by simp
+    case 1
+    then show ?case unfolding ufa_invar_def
+      by (simp add: ufa_init_invar ufa_invarD(1))
+  next
+    case (2 i)
+    then show ?case using ufa_\<beta>_init_desc[OF 2] by auto
  qed
 
-lemma zero_is_min_of_nat_set:
-  assumes"finite S" "(0::nat)\<in>S" shows "Min S = 0"
-proof -
-  have sg1: "S \<noteq> {}" using assms(2) by auto
-  have sg2: "\<forall>a\<in>S. 0\<le>a" by blast
-  show ?thesis 
-    using  Lattices_Big.linorder_class.eq_Min_iff[OF assms(1) sg1, of 0, symmetric] sg2 assms(2) 
-    by argo
-qed
+lemma zero_is_least_of_nat:
+  assumes "P (0::nat)" shows "Least P = 0"
+  using Least_eq_0 assms by simp
 
 lemma \<Phi>_init_value: "\<Phi> [0..<n] (replicate n 0) = 2*n"
 proof -
@@ -76,22 +72,26 @@ proof -
     have 1: "(replicate n 0) ! x = 0" using assms by simp
     have 2: "0 \<in> {k. k \<le> Suc 0 \<and> Suc (Suc 0) \<le> Ackermann k (Suc 0)}"
       using Ackermann01 by auto
-    hence 3: "0 = Min {k. k \<le> Suc 0 \<and> Suc (Suc 0) \<le> Ackermann k (Suc 0)}" 
-      by (simp add: zero_is_min_of_nat_set)
+    hence 3: "0 = Least (\<lambda>k. k \<le> Suc 0 \<and> Suc (Suc 0) \<le> Ackermann k (Suc 0))"  by simp
     have " \<alpha>\<^sub>r (rankr (replicate n 0) x) = \<rho>"
       unfolding rankr_def
       apply (subst 1)
-      unfolding alphar_def \<rho>_def
+      unfolding alphar_def alphar_def[OF \<rho>_gt_0]
       apply auto
-      using 3[symmetric] .
+      using 3[symmetric] by (simp add: Ackermann_base_eq \<rho>_def)
   }
   note alphar_simp = this
+  {
+    fix i assume assms: "i<n"
+    have 1: "(replicate n 0) ! i = 0" using assms by simp
+    hence "rankr (replicate n 0) i = \<rho>" unfolding rankr_def by simp
+  } note rankr_simp = this 
   show ?thesis
     apply simp
     unfolding \<phi>_def
     apply (simp add: if_branch)
     apply (simp add: alphar_simp)
-    unfolding \<rho>_def
+     using rankr_simp unfolding \<rho>_def 
     by simp 
 qed
 
@@ -140,7 +140,18 @@ lemma uf_rep_of_rule: "\<lbrakk>ufa_invar l; i<length l\<rbrakk> \<Longrightarro
   apply (sep_auto simp: rep_of_step height_of_step)
   done
 
-
+lemma height_of_ipc_equiv:
+  assumes "bw_ipc l x d l'"  "ufa_invar l" "x<length l" 
+  shows "d = height_of l x"
+  using assms proof (induction rule: bw_ipc.induct)
+  case (BWIPCBase x l)
+  then show ?case 
+    using h_rep rep_of_iff by fastforce 
+next
+  case (BWIPCStep x y l i l')
+  then show ?case unfolding ufa_\<beta>_start_def 
+    using height_of_step by auto
+qed
 
 subsubsection{*uf_compress lemmas*}
 
@@ -161,6 +172,12 @@ lemma compress_invar:
     apply simp  
     by (metis nth_list_update_eq nth_list_update_neq rep_of_min)
   done
+
+lemma compress_invar_rank:
+  assumes "invar_rank l rkl" "i<length l"
+  shows "invar_rank (l[i := rep_of l i]) rkl"
+  
+  by (metis assms(1) assms(2) compress_evolution invar_rank'_def invar_rank_def invar_rank_evolution list_update_id rep_of_refl)
 
 
 lemma uf_compress_rule: "\<lbrakk> ufa_invar l; i<length l; ci=rep_of l i; invar l szl \<rbrakk> \<Longrightarrow>
@@ -201,7 +218,51 @@ next
 qed
 
 
+lemma uf_compress_rule': assumes "invar_rank l rkl" "i<length l" "ci=rep_of l i" 
+  shows "  <p\<mapsto>\<^sub>al *  $(1+(height_of l i)*3)> uf_compress i ci p 
+  <\<lambda>_. (\<exists>\<^sub>Al'. p\<mapsto>\<^sub>al' * \<up>(invar_rank l' rkl \<and> length l' = length l 
+     \<and> (\<forall>i<length l. rep_of l' i = rep_of l i)) )>\<^sub>t"
+proof -
+
+  have "ufa_invar l" using invar_rank_ufa_invarI[OF assms(1)] .
+  
+  show ?thesis using \<open>ufa_invar l\<close> assms(2,3,1) 
+  proof (induction rule: rep_of_induct)
+    case (base i) thus ?case
+      apply (subst uf_compress.simps)
+      apply (sep_auto simp: rep_of_refl)
+      done
+  next
+    case (step i)
+    note SS = `ufa_invar l` `i<length l` `l!i\<noteq>i` `ci = rep_of l i` `invar_rank l rkl`
+
+
+    have IH': 
+      "<p \<mapsto>\<^sub>a l * $ (1 + height_of l (l ! i) *3)> 
+       uf_compress (l ! i) (rep_of l i) p
+     <\<lambda>_.  (\<exists>\<^sub>Al'. p \<mapsto>\<^sub>a l' * 
+        \<up> (invar_rank l' rkl \<and> length l' = length l 
+           \<and> (\<forall>i<length l'. rep_of l i = rep_of l' i)))
+     >\<^sub>t"   
+      apply(rule pre_rule[OF _ post_rule[OF step.IH[simplified SS rep_of_idx] ]] ) 
+      by (sep_auto simp add: rep_of_idx SS)+  
+
+    show ?case
+      apply (subst uf_compress.simps)
+      apply (sep_auto simp: SS height_of_step heap: )
+       apply(sep_auto heap: IH') 
+
+      using SS apply (sep_auto  ) 
+      subgoal using compress_invar_rank by simp
+      subgoal using ufa_compress_invar by fastforce
+      subgoal using ufa_compress_aux(2) by (auto dest!: invar_rank_ufa_invarI)
+      done
+  qed
+qed
+
+
 subsubsection{*uf_rep_of_c lemmas*}
+
 
 lemma uf_rep_of_c_rule: "\<lbrakk>ufa_invar l; i<length l; invar l szl\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4+height_of l i*4)> uf_rep_of_c p i <\<lambda>r.  (\<exists>\<^sub>Al'. p\<mapsto>\<^sub>al' 
@@ -209,9 +270,61 @@ lemma uf_rep_of_c_rule: "\<lbrakk>ufa_invar l; i<length l; invar l szl\<rbrakk> 
        \<and> length l' = length l 
        \<and> (\<forall>i<length l. rep_of l' i = rep_of l i)))>\<^sub>t"
   unfolding uf_rep_of_c_def
-  by (sep_auto heap: uf_compress_rule uf_rep_of_rule) 
+  by (sep_auto (nopost) heap: uf_rep_of_rule uf_compress_rule)
+find_theorems "_ \<le> _""_ \<Longrightarrow>\<^sub>A _"
+find_theorems "<_> _ <_>" "_ \<Longrightarrow>\<^sub>A _ "
+thm pre_rule''[OF _ gc_time]
+lemma uf_rep_of_c_rule'': "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  (\<exists>\<^sub>Al'. p\<mapsto>\<^sub>al' 
+    * \<up>(r=rep_of l i \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i)))>\<^sub>t"
+proof goal_cases
+  case 1
+  hence d_def:"d = height_of l i" using height_of_ipc_equiv invar_rank_ufa_invarI by blast
+  from 1 show ?case unfolding d_def 
+  unfolding uf_rep_of_c_def apply -
+  apply (frule invar_rank_ufa_invarI)
+  by (sep_auto  heap: uf_rep_of_rule uf_compress_rule')
+qed
 
-thm height_of_ub
+lemma uf_rep_of_c_rule': "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  p\<mapsto>\<^sub>al' 
+    * \<up>(r=rep_of l i \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"sorry
+
+
+definition uf_rep_of_c_time where "uf_rep_of_c_time n = 2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4"
+
+lemma frame_credits: "\<lbrakk> t'\<le>t; <P * $t'> f <Q> \<rbrakk> \<Longrightarrow> <P * $t> f <Q>" sorry
+
+
+
+lemma uf_rep_of_c_rule''': "\<lbrakk>invar_rank l rkl; i<length l\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * $(4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) )> uf_rep_of_c p i <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
+    *$(4* \<Phi> l' rkl) * \<up>(r=rep_of l i \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
+proof goal_cases
+  case 1
+  obtain d l' where bw: " bw_ipc l i d l'" " \<Phi> l' rkl + d < \<Phi> l rkl + 2 * \<alpha>\<^sub>r (length l + (\<rho> - 1))" using
+      amortized_cost_of_iterated_path_compression_global[OF 1(1,2)] by blast
+  hence potentialjump: "4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) \<ge> 4*\<Phi> l' rkl + d*4 + 4" 
+    unfolding uf_rep_of_c_time_def by fastforce
+  show ?case apply (rule frame_credits) apply (rule potentialjump) using 1 bw(1)
+    by (sep_auto heap: uf_rep_of_c_rule'[where d=d]) 
+  qed
+      
+definition is_uf2 :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" where 
+  "is_uf2 R u \<equiv> case u of (s,p) \<Rightarrow> 
+  \<exists>\<^sub>Al rkl. p\<mapsto>\<^sub>al * s\<mapsto>\<^sub>arkl 
+    * \<up>(ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
+    * $(\<Phi> l rkl * 10)"
+
+thm ufa_\<alpha>_dom_card
+
+
 
 definition height_ub :: "nat \<Rightarrow> nat" where "height_ub n = nat (ceiling (log 2 n))"
 
