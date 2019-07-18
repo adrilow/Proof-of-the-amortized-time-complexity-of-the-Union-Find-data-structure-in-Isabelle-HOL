@@ -324,42 +324,22 @@ definition is_uf2 :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" 
 
 thm ufa_\<alpha>_dom_card
 
-
-
-definition height_ub :: "nat \<Rightarrow> nat" where "height_ub n = nat (ceiling (log 2 n))"
-
-
-lemma height_ub_bound[asym_bound]: "height_ub \<in> \<Theta>(\<lambda>n. ln n)"
-  unfolding height_ub_def using abcd_lnx[of 0 1 1 0] by auto
-
-lemma height_ub:
-  assumes "invar l sl" "ufa_invar l" "i<length l"
-  shows "height_of l i \<le> height_ub (length l)"
-proof -
-  from height_of_ub[OF assms] have "2 ^ height_of l i \<le> length l" .
-  from le_log2_of_power[OF this]
-    show ?thesis unfolding height_ub_def by linarith
-  qed
-
-
-
-lemma uf_rep_of_c_rule_ub: 
-  assumes "ufa_invar l"  "i<length l" "invar l szl"
-  shows "<p\<mapsto>\<^sub>al * $(4+ height_ub (length l)*4)> uf_rep_of_c p i <\<lambda>r. (\<exists>\<^sub>Al'. p\<mapsto>\<^sub>al' 
-    * \<up>(r=rep_of l i \<and> ufa_invar l' \<and> invar l' szl
-       \<and> length l' = length l 
-       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))) >\<^sub>t"
-proof -
-  from assms height_ub have "height_of l i \<le> height_ub (length l)" by auto
-  then obtain x where p: "height_ub (length l) = height_of l i + x"  
-    using le_Suc_ex by blast  
-  show ?thesis unfolding p
-    using assms by(sep_auto heap: uf_rep_of_c_rule)
-qed
-
-
 subsubsection{*uf_cmp lemmas*}
 
+definition uf_cmp_time where "uf_cmp_time n \<equiv> 2 * uf_rep_of_c_time n + 10"
+
+lemma uf_cmp_rule: "\<lbrakk>invar_rank l rkl\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * $(4*(\<Phi> l rkl + uf_cmp_time (length l)) )> 
+  uf_cmp u i j 
+  <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
+    *$(4* \<Phi> l' rkl) * \<up>(r\<longleftrightarrow>(rep_of l i = rep_of l j) \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
+  unfolding uf_cmp_time_def uf_cmp_def
+  apply vcg
+  apply simp
+  apply sep_auto  
+  sorry
 
 
 lemma cnv_to_ufa_\<alpha>_eq: 
@@ -370,13 +350,9 @@ lemma cnv_to_ufa_\<alpha>_eq:
 lemma "  card (Domain (ufa_\<alpha> l)) = length l"
   by simp
 
-definition uf_cmp_time :: "nat \<Rightarrow> nat" where "uf_cmp_time n = 10+ height_ub n*8"
 
-lemma uf_cmp_time_bound[asym_bound]: 
-  "uf_cmp_time \<in> \<Theta>(\<lambda>n. ln n)" unfolding uf_cmp_time_def by auto2 
-
-lemma uf_cmp_rule:
-  "<is_uf R u * $(uf_cmp_time (card (Domain R)))> uf_cmp u i j <\<lambda>r. is_uf R u * \<up>(r\<longleftrightarrow>(i,j)\<in>R)>\<^sub>t" 
+lemma uf_cmp_rule: "\<lbrakk>invar_rank l rkl\<rbrakk> \<Longrightarrow>
+  <is_uf R u * $(uf_cmp_time (card (Domain R)))> uf_cmp u i j <\<lambda>r. is_uf R u * \<up>(r\<longleftrightarrow>(i,j)\<in>R)>\<^sub>t" 
   sorry
   
 
