@@ -330,16 +330,104 @@ definition uf_cmp_time where "uf_cmp_time n \<equiv> 2 * uf_rep_of_c_time n + 10
 
 lemma uf_cmp_rule: "\<lbrakk>invar_rank l rkl\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4*(\<Phi> l rkl + uf_cmp_time (length l)) )> 
-  uf_cmp u i j 
+  uf_cmp (s,p) i j 
   <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
-    *$(4* \<Phi> l' rkl) * \<up>(r\<longleftrightarrow>(rep_of l i = rep_of l j) \<and> invar_rank l' rkl
+    *$(4* \<Phi> l' rkl) * \<up>((r\<longleftrightarrow>(rep_of l i = rep_of l j)) \<and> invar_rank l' rkl
        \<and> length l' = length l 
        \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
-  unfolding uf_cmp_time_def uf_cmp_def
+proof goal_cases
+  case 1
+  have sum1: "4 * \<Phi> l rkl +
+        (8 * uf_rep_of_c_time (length l) + 40) = 4 * \<Phi> l rkl +
+        (8 * uf_rep_of_c_time (length l) + 39) + 1" by algebra
+  from 1 show ?case
+unfolding uf_cmp_time_def uf_cmp_def
   apply vcg
   apply simp
-  apply sep_auto  
-  sorry
+  apply (subst sum1) apply (subst time_credit_add[of "(4 * \<Phi> l rkl +
+        (8 * uf_rep_of_c_time (length l) + 39))" 1])
+  apply (sep_auto heap: length_rule)
+  apply safe proof goal_cases
+  case (1 x)
+  then show ?case 
+  proof (cases "x \<le> i \<or> x \<le> j")
+    case True
+    then show ?thesis using 1 apply vcg 
+    proof goal_cases
+      case (1 x')
+      hence " p \<mapsto>\<^sub>a l *
+    $ (\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 8 + 38) *
+    \<up> (\<not> x') \<Longrightarrow>\<^sub>A p \<mapsto>\<^sub>a l * true * $ (4 * \<Phi> l rkl) *
+       \<up> (x' = (rep_of l i = rep_of l j) \<and>
+          invar_rank l rkl \<and>
+          length l = length l \<and>
+          (\<forall>i<length l. rep_of l i = rep_of l i))"  sorry
+      then show ?case  using ent_ex_postI by fast
+    qed
+next
+  case False
+  have sum2: "\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 8 + 39 
+            = \<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 4 + uf_rep_of_c_time (length l) * 4 + 39" 
+    by algebra
+  have sep2: "$(\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 4 +
+            uf_rep_of_c_time (length l) * 4 +
+            39)  =   $ (\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 4) * 
+            $ (uf_rep_of_c_time (length l) * 4 + 39)"
+    using time_credit_add add.assoc[of "\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 4" 
+          "uf_rep_of_c_time (length l) * 4" 39] by presburger
+
+  also have sep3: "\<dots> =    $ (4* (\<Phi> l rkl + uf_rep_of_c_time (length l))) * 
+            $ (uf_rep_of_c_time (length l) * 4 + 39)" 
+    by (simp add: mult.commute)
+  have sep4: "p \<mapsto>\<^sub>a l *
+         ($ (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l))) *
+          $ (uf_rep_of_c_time (length l) * 4 + 39)) = p \<mapsto>\<^sub>a l *
+   $ (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l))) *
+   $ (uf_rep_of_c_time (length l) * 4 + 39 )" by simp
+  have "i<x" "j<x" using False by auto
+  with \<open>invar_rank l rkl\<close> show ?thesis apply auto apply vcg 
+    apply (subst sum2)
+     apply (subst sep2)
+     apply (subst sep3)
+     apply (subst sep4)
+    apply (rule frame_rule[of "p \<mapsto>\<^sub>a l * $ (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l)))" "uf_rep_of_c p i"
+                   _ "$ (uf_rep_of_c_time (length l) * 4 + 39)" ] )
+     apply (vcg heap: uf_rep_of_c_rule''' )
+    apply vcg apply auto proof goal_cases
+    case (1 x')
+    then show ?case apply (vcg (ss)) apply (vcg (ss)) 
+    proof goal_cases
+      case (1 l')
+      hence inv:"invar_rank l' rkl" by blast
+      from 1 have ll': "length l = length l'" by argo
+      have sum3: "4 * \<Phi> l' rkl + (uf_rep_of_c_time (length l) * 4 + 39) = 4 * (\<Phi> l' rkl +
+        (uf_rep_of_c_time (length l))) + 39" by algebra
+      have sep5: "p \<mapsto>\<^sub>a l' * true * $ (4 * (\<Phi> l' rkl + uf_rep_of_c_time (length l')) + 39) 
+                = p \<mapsto>\<^sub>a l' *        $ (4 * (\<Phi> l' rkl + uf_rep_of_c_time (length l'))) * ($(39) * true)"        
+        by (simp add: time_credit_add)
+      from 1 ll' inv show ?case apply (subst sum3) apply (subst (asm) ll')+ apply (subst ll')+
+        apply vcg apply (subst sep5)
+        apply (rule frame_rule[of "p \<mapsto>\<^sub>a l' * $ (4 * (\<Phi> l' rkl + uf_rep_of_c_time (length l')))"
+             "uf_rep_of_c p j" _ " ($ 39 * true)"])
+         apply (vcg heap: uf_rep_of_c_rule''' )
+        apply vcg
+        apply auto
+        apply vcg
+        apply auto proof goal_cases
+        case (1 l'')
+        have "p \<mapsto>\<^sub>a l'' * true * $ (\<Phi> l'' rkl * 4 + 38) \<Longrightarrow>\<^sub>A
+  p \<mapsto>\<^sub>a l'' * true * $ (4 * \<Phi> l'' rkl) *
+  \<up> (invar_rank l'' rkl \<and>
+     length l'' = length l' \<and>
+     (\<forall>i<length l'. rep_of l'' i = rep_of l i))" using 1 apply sep_auto
+          by (smt assn_times_assoc gc_time le_add1 match_first merge_true_star mult.commute)
+        then  show ?case using ent_ex_postI by fast 
+      qed
+    qed
+  qed   
+qed
+qed
+qed
 
 
 lemma cnv_to_ufa_\<alpha>_eq: 
