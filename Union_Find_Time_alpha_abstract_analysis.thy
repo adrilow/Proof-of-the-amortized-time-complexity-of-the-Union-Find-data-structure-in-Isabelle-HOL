@@ -1867,10 +1867,20 @@ lemma displeasure_parent_if_unpleasant:
   apply (subst ancestors_of_parent[OF assms(1)]) using assms 
 proof goal_cases
   case 1
-  have "x\<notin> ancestors l y" using assms unfolding ancestors_def 
+  have x1: "x\<notin> ancestors l y" using assms unfolding ancestors_def 
     by (metis (no_types, lifting) aciclicity case_prodD contextasm invar_rank_def
         mem_Collect_eq trancl.intros(1) trancl_rtrancl_trancl ufa_\<beta>_def ufa_\<beta>_start_def)
-  then show ?case using 1 sorry
+  hence x1': "{x} \<inter> (ancestors l y \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y}) = {}" by fast
+  have x2: "x\<in>{y. \<not> pleasant y \<and> y \<noteq> l ! y}" using assms unfolding ufa_\<beta>_start_def by fast
+  have sg: "(ancestors l y \<union> {x}) \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y} 
+        = {x} \<union> (ancestors l y \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y})" using x1 x2 by fast
+  have fx: "finite {x}" by blast
+  have fr'': "y < length l" using assms(1) unfolding ufa_\<beta>_start_def by fast
+  have fr': "finite (ancestors l y)" using assms(1) fr'' 
+    unfolding ancestors_def  ufa_\<beta>_start_def  sorry
+  hence fr: " finite (ancestors l y \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y})" by blast
+  show ?case using x1'  unfolding ufa_\<beta>_start_def 
+    apply (subst sg) using card_Un_disjoint[OF fx fr x1'] by simp
 qed
   
 
@@ -1903,10 +1913,31 @@ definition levels where "levels x = card (level l rkl `(ancestors l x \<inter> {
 \<comment>\<open>If the image of the function @{term "level l rkl"} is included in @{term "{0..<n}"},
    then @{term "levels x"} is at most n.\<close>
 
+lemma hereditary_property: 
+  assumes "\<And>x y. P x \<Longrightarrow> (x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> P y" "P x" "y\<in> ancestors l x"
+  shows "P y"
+proof -
+  have sg: "(x,y)\<in> (ufa_\<beta>_start l)\<^sup>*" using assms unfolding ancestors_def by fast
+   show ?thesis using sg assms unfolding ancestors_def
+     by (induction rule: rtrancl_induct) blast+
+ qed
+
 lemma bounded_levels:
   assumes "ok l rkl x"
   shows "levels x \<le> bound"
-  sorry
+  apply (rule order.trans[of "levels x" "card {0..<bound}" bound])
+   prefer 2 apply auto[1]
+  unfolding levels_def
+  apply (rule card_mono)
+   apply auto[1]
+  apply (subst subset_iff)
+  apply auto
+proof goal_cases
+  case (1 xa)
+  show ?case
+    apply (rule level_bounded[OF _ 1(2)])
+    using 1 assms hereditary_property[OF ok_hereditary] by fast
+qed
   
 
 lemma levels_parent_if_pleasant:
@@ -1972,7 +2003,7 @@ definition top_part where "top_part l rkl x \<equiv> \<alpha>\<^sub>r (rankr rkl
 
 context \<comment>\<open>invar_rank\<close>
   fixes l::"nat list" and rkl::"nat list"
-  assumes "invar_rank l rkl"
+  assumes contextasm: "invar_rank l rkl"
 begin
 
 interpretation pl: Pleasant top_part level .
@@ -1982,7 +2013,15 @@ lemma top_part_hereditary:
   assumes  "top_part l rkl x" "(x,y)\<in>(ufa_\<beta>_start l)"
   shows "top_part l rkl y"
     \<comment>\<open>rep_of l x = rep_of l y and 1(1) together with rank increasing along edges should suffice\<close>
-  sorry
+proof -
+  have "ufa_invar l" using contextasm unfolding invar_rank_def by blast
+  have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  have h3: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_ufa_\<beta>_refl[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] assms(2) 
+    by (smt \<open>ufa_invar l\<close> case_prodD mem_Collect_eq rep_of_bound rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
+  have h4: "rep_of l x = rep_of l y" using assms \<open>ufa_invar l\<close> rep_of_idx 
+      unfolding ufa_\<beta>_start_def by force
+  thus ?thesis unfolding top_part_def
+  
 
 
 lemma compress_preserves_top_part_above_y:
