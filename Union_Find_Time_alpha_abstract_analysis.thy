@@ -841,6 +841,21 @@ definition descendants where
 definition ancestors where
   "ancestors l i = {j. (i,j)\<in> (ufa_\<beta>_start l)\<^sup>*}"
 
+lemma ancestors_in_domain:
+  assumes "i<length l" 
+  shows "ancestors l i \<subseteq> {0..<length l}"
+  unfolding ancestors_def 
+  apply auto 
+  proof goal_cases
+  case (1 x)
+  then show ?case using assms proof (induction rule: rtrancl_induct)
+    case (step y z)
+    then show ?case unfolding ufa_\<beta>_start_def by simp
+  qed simp
+qed
+
+
+
 definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
                             \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<and>  i\<noteq>j \<longrightarrow> rkl ! i < rkl ! j) 
                             \<comment> \<open>if j is on the path from i to rep_of l i, then rank of j is bigger than rank of i\<close>
@@ -1567,14 +1582,44 @@ lemma link_cannot_decrease_rank:
   by (simp cong: if_cong)
 
 lemma link_preserves_rank_of_non_roots:
-  assumes "x<length l" "y<length l" "v<length l" 
-  shows "rkl!v \<le> (union_by_rank_rkl rkl x y)!v"
-  sorry
+  assumes "x<length l" "y<length l" "v<length l" "x=l!x" "v\<noteq>l!v"
+  shows "rkl!v = (union_by_rank_rkl rkl x y)!v"
+proof -
+  have "x\<noteq>v" using assms by blast
+  thus ?thesis unfolding union_by_rank_rkl_def 
+    using assms nth_list_update_neq[OF \<open>x \<noteq>v\<close>, of  rkl "Suc (rkl!x)"]
+    by (auto cong: if_cong)  
+qed
 
 lemma invar_rank_link:
   assumes "invar_rank l rkl" "x < length l" "y < length l" "x=l!x" "y=l!y" "x\<noteq>y"
   shows "invar_rank (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
   sorry
+
+lemma invar_rank_compress:
+  assumes "invar_rank l rkl"  "(x,y)\<in>(ufa_\<beta>_start l)"
+  shows "invar_rank (l[x:= rep_of l y]) rkl"
+  unfolding invar_rank_def using assms proof (safe,goal_cases)
+  case 1
+  then show ?case unfolding ufa_\<beta>_start_def
+    using invar_rank_ufa_invarI rep_of_idx ufa_compress_invar by auto
+next
+  case 2
+  then show ?case unfolding invar_rank_def by auto
+next
+  case (3 i j)
+  then show ?case unfolding ufa_\<beta>_start_def
+    by (smt case_prodD invar_rank_ufa_invarI length_list_update mem_Collect_eq 
+        nth_list_update' parent_has_greater_rank rank_increases_strictly_along_path 
+        rep_of_iff rep_of_ufa_\<beta>)
+next
+  case 4
+  then show ?case unfolding invar_rank_def  unfolding ufa_\<beta>_start_def apply auto
+    by (smt case_prodD mem_Collect_eq nth_list_update_eq nth_list_update_neq rep_of_path_iff sum_ivl_cong)
+next
+  case (5 i)
+  then show ?case unfolding invar_rank_def apply auto sorry
+qed
 
 
 \<comment>\<open>This is only an application of @{thm ufa_union_correct}\<close>
@@ -1597,7 +1642,13 @@ for l::"nat list" and rkl::"nat list"
 lemma compress_evolution:
   assumes "invar_rank l rkl" "x<length l" "x\<noteq>l!x" 
   shows "evolution l rkl (l[x:= rep_of l x]) rkl"
-  sorry
+proof -
+  have pxz: "rep_of l (l!x) = rep_of l x" using assms unfolding invar_rank_def
+    using rep_of_idx by blast
+  have "l!x < length l" using assms unfolding invar_rank_def ufa_invar_def by blast
+  hence "(x,l!x)\<in> (ufa_\<beta>_start l)" using assms unfolding ufa_\<beta>_start_def by blast
+  with assms pxz EvCompress show ?thesis by fastforce
+qed
 
 context \<comment>\<open>StudyOfEvolution\<close>
   fixes l::"nat list" and rkl::"nat list" and l'::"nat list" and rkl'::"nat list"
@@ -1605,22 +1656,35 @@ context \<comment>\<open>StudyOfEvolution\<close>
 begin
 
 lemma invar_rank_evolution: "invar_rank l' rkl'"
-  sorry
-
+  using contextasm(2,1) invar_rank_link invar_rank_compress 
+  by (induction rule: evolution.induct) blast+
+  
 
 lemma rank_grows: "rkl!v \<le> rkl'!v"
-  sorry
+  using contextasm(2,1) link_cannot_decrease_rank 
+  by (induction rule: evolution.induct) blast+
 
 lemma non_root_has_constant_rank:
-  assumes "v\<noteq>l!v"
+  assumes "v<length l" "v\<noteq>l!v"
   shows "rkl!v = rkl'!v"
-  sorry
+  using contextasm(2,1) assms link_preserves_rank_of_non_roots 
+  by (induction rule: evolution.induct) blast+
 
 
 lemma non_root_forever:
   assumes "v\<noteq>l!v"
   shows "v\<noteq>l'!v"
-  sorry
+  using contextasm(2,1) proof (induction rule: evolution.induct)
+  case (EvUnion x y)
+  then show ?case unfolding union_by_rank_l_def using assms rep_of_refl
+    apply (simp cong: if_cong) by (metis nth_list_update_neq)
+next
+  case (EvCompress x y)
+  have "ufa_invar l" using invar_rank_ufa_invarI[OF contextasm(1)] .
+  then show ?case using assms unfolding invar_rank_def
+    by (metis (no_types, lifting) case_prodD local.EvCompress(1) mem_Collect_eq 
+        nth_list_update_eq nth_list_update_neq rep_of_min ufa_\<beta>_start_def)
+qed
 
 \<comment>\<open>The quantity @{term "rkl!(l!v)"} grows with time, either because the rank of the parent of v
   changes (during a union), or because the parent of v changes (during compression).\<close>
@@ -1876,8 +1940,8 @@ proof goal_cases
         = {x} \<union> (ancestors l y \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y})" using x1 x2 by fast
   have fx: "finite {x}" by blast
   have fr'': "y < length l" using assms(1) unfolding ufa_\<beta>_start_def by fast
-  have fr': "finite (ancestors l y)" using assms(1) fr'' 
-    unfolding ancestors_def  ufa_\<beta>_start_def  sorry
+  have fr': "finite (ancestors l y)" using ancestors_in_domain[OF \<open>y<length l\<close>]
+    using rev_finite_subset finite_atLeastZeroLessThan_int by blast
   hence fr: " finite (ancestors l y \<inter> {y. \<not> pleasant y \<and> y \<noteq> l ! y})" by blast
   show ?case using x1'  unfolding ufa_\<beta>_start_def 
     apply (subst sg) using card_Un_disjoint[OF fx fr x1'] by simp
