@@ -10,6 +10,13 @@ definition is_uf :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" w
     * \<up>(ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
     * $(\<Phi> l rkl)"
 
+definition is_uf2 :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" where 
+  "is_uf2 R u \<equiv> case u of (s,p) \<Rightarrow> 
+  \<exists>\<^sub>Al rkl. p\<mapsto>\<^sub>al * s\<mapsto>\<^sub>arkl 
+    * \<up>(ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
+    * $(\<Phi> l rkl * 4)"
+
+
 
 lemma of_list_rule':
     "<$ (1 + n)> Array.of_list [0..<n] <\<lambda>r. r \<mapsto>\<^sub>a [0..<n]>"
@@ -95,9 +102,13 @@ proof -
     by simp 
 qed
 
-definition uf_init_time :: "nat \<Rightarrow> nat" where "uf_init_time n == (2*n+3+2*n)"
+definition uf_init_time :: "nat \<Rightarrow> nat" where "uf_init_time n \<equiv> (2*n+3+2*n)"
+definition uf_init_time2 :: "nat \<Rightarrow> nat" where "uf_init_time2 n \<equiv> 4*(2*n+3+2*n)"
 
 lemma uf_init_bound[asym_bound]: "uf_init_time \<in> \<Theta>(\<lambda>n. n)" 
+  unfolding uf_init_time_def by auto2
+
+lemma uf_init_bound2[asym_bound]: "uf_init_time2 \<in> \<Theta>(\<lambda>n. n)" 
   unfolding uf_init_time_def by auto2
 
 lemma Array_new_rule'[sep_heap_rules]: "<$ (n + 1) * true> Array.new n x <\<lambda>r. r \<mapsto>\<^sub>a replicate n x>\<^sub>t"
@@ -126,7 +137,38 @@ proof goal_cases
     done
   then show ?case by sep_auto
 qed
- 
+
+
+lemma uf_init_rule':
+    "<$(uf_init_time2 n)> uf_init n <is_uf2 {(i,i) |i. i<n}  >\<^sub>t"
+  unfolding uf_init_time2_def uf_init_def is_uf2_def[abs_def]
+  apply (vcg)
+   apply (sep_auto heap: of_list_rule')
+  apply (vcg)
+  apply clarsimp
+  apply (sep_auto (nopre) (nopost) simp: ufa_init_invar)
+  apply clarsimp
+  apply (vcg)
+  apply clarsimp 
+proof goal_cases
+  case (1 x xa)
+  have sep1: "( x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 *
+    $ (n * 14 + 9) \<Longrightarrow>\<^sub>A
+    x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * true * $ (8 * n)) 
+      = ( x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * $ (n * 14 + 9 + 0) \<Longrightarrow>\<^sub>A
+    x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0  * $ (8 * n + 0) * true)" by auto
+
+have " x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 *  $ (n * 14 + 9) \<Longrightarrow>\<^sub>A
+       x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * true * $ (\<Phi> [0..<n] (replicate n 0) * 4) *
+       \<up> (ufa_invar [0..<n] \<and> ufa_\<alpha> [0..<n] = {(i, i) |i. i < n}
+       \<and> length (replicate n 0) = length [0..<n] \<and> invar_rank [0..<n] (replicate n 0))"
+  apply (auto simp add: ufa_init_invar ufa_init_correct ufa_init_invar' \<Phi>_init_value) 
+  apply (subst sep1)
+  apply (rule gc_time'[of "n * 14 + 9" "8*n" "x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0" 0])
+  unfolding time_credit_ge_def by auto
+  then show ?case by sep_auto
+qed
+  
 
 subsubsection{*uf_rep_of lemmas*}
 
@@ -176,8 +218,7 @@ lemma compress_invar:
 lemma compress_invar_rank:
   assumes "invar_rank l rkl" "i<length l"
   shows "invar_rank (l[i := rep_of l i]) rkl"
-  
-  by (metis assms(1) assms(2) compress_evolution invar_rank'_def invar_rank_def invar_rank_evolution list_update_id rep_of_refl)
+  by (metis assms(1,2) compress_evolution invar_rank_evolution list_update_id rep_of_refl)
 
 
 lemma uf_compress_rule: "\<lbrakk> ufa_invar l; i<length l; ci=rep_of l i; invar l szl \<rbrakk> \<Longrightarrow>
@@ -192,8 +233,6 @@ proof (induction rule: rep_of_induct)
 next
   case (step i)
   note SS = `ufa_invar l` `i<length l` `l!i\<noteq>i` `ci = rep_of l i` `invar l szl`
-
-   
   have IH': 
     "<p \<mapsto>\<^sub>a l * $ (1 + height_of l (l ! i) *3)> 
        uf_compress (l ! i) (rep_of l i) p
@@ -203,13 +242,11 @@ next
      >\<^sub>t"   
     apply(rule pre_rule[OF _ post_rule[OF step.IH[simplified SS rep_of_idx] ]] ) 
     by (sep_auto simp add: rep_of_idx SS)+  
-
   show ?case
     apply (subst uf_compress.simps)
     apply (sep_auto simp: SS height_of_step heap: )
-    apply(sep_auto heap: IH') 
- 
-    using SS apply (sep_auto  ) 
+     apply(sep_auto heap: IH') 
+    using SS apply sep_auto
     subgoal using compress_invar by simp
     subgoal using ufa_compress_invar by fastforce
     subgoal by simp
@@ -225,7 +262,7 @@ lemma uf_compress_rule': assumes "invar_rank l rkl" "i<length l" "ci=rep_of l i"
 proof -
 
   have "ufa_invar l" using invar_rank_ufa_invarI[OF assms(1)] .
-  
+
   show ?thesis using \<open>ufa_invar l\<close> assms(2,3,1) 
   proof (induction rule: rep_of_induct)
     case (base i) thus ?case
@@ -235,8 +272,6 @@ proof -
   next
     case (step i)
     note SS = `ufa_invar l` `i<length l` `l!i\<noteq>i` `ci = rep_of l i` `invar_rank l rkl`
-
-
     have IH': 
       "<p \<mapsto>\<^sub>a l * $ (1 + height_of l (l ! i) *3)> 
        uf_compress (l ! i) (rep_of l i) p
@@ -246,13 +281,11 @@ proof -
      >\<^sub>t"   
       apply(rule pre_rule[OF _ post_rule[OF step.IH[simplified SS rep_of_idx] ]] ) 
       by (sep_auto simp add: rep_of_idx SS)+  
-
     show ?case
       apply (subst uf_compress.simps)
       apply (sep_auto simp: SS height_of_step heap: )
        apply(sep_auto heap: IH') 
-
-      using SS apply (sep_auto  ) 
+      using SS apply sep_auto 
       subgoal using compress_invar_rank by simp
       subgoal using ufa_compress_invar by fastforce
       subgoal using ufa_compress_aux(2) by (auto dest!: invar_rank_ufa_invarI)
@@ -271,8 +304,7 @@ lemma uf_rep_of_c_rule: "\<lbrakk>ufa_invar l; i<length l; invar l szl\<rbrakk> 
        \<and> (\<forall>i<length l. rep_of l' i = rep_of l i)))>\<^sub>t"
   unfolding uf_rep_of_c_def
   by (sep_auto (nopost) heap: uf_rep_of_rule uf_compress_rule)
-find_theorems "_ \<le> _""_ \<Longrightarrow>\<^sub>A _"
-find_theorems "<_> _ <_>" "_ \<Longrightarrow>\<^sub>A _ "
+
 thm pre_rule''[OF _ gc_time]
 lemma uf_rep_of_c_rule'': "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  (\<exists>\<^sub>Al'. p\<mapsto>\<^sub>al' 
@@ -288,16 +320,50 @@ proof goal_cases
   by (sep_auto  heap: uf_rep_of_rule uf_compress_rule')
 qed
 
+lemma frame_credits: "\<lbrakk> t'\<le>t; <P * $t'> f <Q>\<^sub>t \<rbrakk> \<Longrightarrow> <P * $t> f <Q>\<^sub>t" sorry
+
+lemma uf_compress_same_rule:  
+ "  <p\<mapsto>\<^sub>al *  $1> uf_compress i i p <\<lambda>_. p\<mapsto>\<^sub>al>\<^sub>t"
+  apply (subst uf_compress.simps)
+  by sep_auto
+  
+
+
 lemma uf_rep_of_c_rule': "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  p\<mapsto>\<^sub>al' 
     * \<up>(r=rep_of l i \<and> invar_rank l' rkl
        \<and> length l' = length l 
-       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"sorry
-
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
+proof goal_cases
+  case 1
+  note assms= 1
+  have "ufa_invar l" using invar_rank_ufa_invarI[OF 1(1)] .
+  show ?case using 1(3,1,2) \<open>ufa_invar l\<close> proof (induction rule: bw_ipc.induct)
+    case (BWIPCBase x l)
+    have "rep_of l x = x" using BWIPCBase using rep_of_refl by auto
+    hence "height_of l x = 0" using h_rep[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] by argo
+    hence uf_rep_of_spec: "<p \<mapsto>\<^sub>a l * $ 2> uf_rep_of p x <\<lambda>r. p \<mapsto>\<^sub>a l * \<up> (r = rep_of l x)>\<^sub>t" 
+      using uf_rep_of_rule[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>, of p]
+      apply (subst(asm) \<open>height_of l x = 0\<close>) apply (subst(asm) \<open>height_of l x = 0\<close>)
+      apply simp apply (subst (asm) numeral_2_eq_2[symmetric]) by blast
+    show ?case unfolding uf_rep_of_c_def 
+      apply (vcg heap: uf_rep_of_spec)
+      apply safe using \<open>height_of l x = 0\<close>
+    proof goal_cases
+      case (1 x')
+      show ?case using \<open>rep_of l x = x\<close> \<open>invar_rank l rkl\<close> by (sep_auto heap: uf_compress_same_rule)
+    qed
+  next
+    case (BWIPCStep x y l i l')
+    hence "y<length l" unfolding ufa_\<beta>_start_def by fast
+    note step= BWIPCStep(1,2,4,5) \<open>y<length l\<close> BWIPCStep(6) 
+               height_of_ipc_equiv[OF \<open>bw_ipc l y i l'\<close> \<open>ufa_invar l\<close> \<open>y<length l\<close>]
+    note IH = BWIPCStep(3)[OF \<open>invar_rank l rkl\<close> \<open>y<length l\<close> \<open>ufa_invar l\<close>]
+    then show ?case using step sorry
+  qed
+qed
 
 definition uf_rep_of_c_time where "uf_rep_of_c_time n = 2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4"
-
-lemma frame_credits: "\<lbrakk> t'\<le>t; <P * $t'> f <Q> \<rbrakk> \<Longrightarrow> <P * $t> f <Q>" sorry
 
 
 
@@ -314,21 +380,33 @@ proof goal_cases
     unfolding uf_rep_of_c_time_def by fastforce
   show ?case apply (rule frame_credits) apply (rule potentialjump) using 1 bw(1)
     by (sep_auto heap: uf_rep_of_c_rule'[where d=d]) 
-  qed
-      
-definition is_uf2 :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" where 
-  "is_uf2 R u \<equiv> case u of (s,p) \<Rightarrow> 
-  \<exists>\<^sub>Al rkl. p\<mapsto>\<^sub>al * s\<mapsto>\<^sub>arkl 
-    * \<up>(ufa_\<alpha> l = R \<and> length rkl = length l \<and> invar_rank l rkl)
-    * $(\<Phi> l rkl * 4)"
+qed
 
-thm ufa_\<alpha>_dom_card
+definition uf_rep_of_c_time2 where "uf_rep_of_c_time2 n = 4* (2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4)"
+
+lemma uf_rep_of_c_rule2: "\<lbrakk>invar_rank l rkl; i<length l\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * $(\<Phi> l rkl * 4 + uf_rep_of_c_time2 (length l)) > uf_rep_of_c p i <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
+    *$(\<Phi> l' rkl * 4) * \<up>(r=rep_of l i \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
+  unfolding uf_rep_of_c_time2_def apply (subst uf_rep_of_c_time_def[symmetric]) 
+proof goal_cases
+  case 1
+  have sum1: "\<Phi> l rkl * 4 + 4 * uf_rep_of_c_time (length l) 
+      = 4* (\<Phi> l rkl  + uf_rep_of_c_time (length l))" by auto
+  { fix l' have "\<Phi> l' rkl * 4 = 4* \<Phi> l' rkl" by presburger } note sum2 = this
+  show ?case apply(subst sum1) apply(subst sum2)
+    using 1 using uf_rep_of_c_rule'''[OF 1, of p] by blast
+qed
+
+
+      
 
 subsubsection{*uf_cmp lemmas*}
 
 definition uf_cmp_time where "uf_cmp_time n \<equiv> 8 * uf_rep_of_c_time n + 40"
 
-lemma uf_cmp_rule: "\<lbrakk>invar_rank l rkl\<rbrakk> \<Longrightarrow>
+lemma uf_cmp_rule: "\<lbrakk>invar_rank l rkl; i<length l; j<length l\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4*\<Phi> l rkl + uf_cmp_time (length l) )> 
   uf_cmp (s,p) i j 
   <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
@@ -350,20 +428,6 @@ proof goal_cases
     case (1 x)
     then show ?case 
     proof (cases "x \<le> i \<or> x \<le> j")
-      case True
-      then show ?thesis using 1 apply vcg 
-      proof goal_cases
-        case (1 x')
-        hence " p \<mapsto>\<^sub>a l *
-    $ (\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 8 + 38) *
-    \<up> (\<not> x') \<Longrightarrow>\<^sub>A p \<mapsto>\<^sub>a l * true * $ (4 * \<Phi> l rkl) *
-       \<up> (x' = (rep_of l i = rep_of l j) \<and>
-          invar_rank l rkl \<and>
-          length l = length l \<and>
-          (\<forall>i<length l. rep_of l i = rep_of l i))"  sorry
-        then show ?case  using ent_ex_postI by fast
-      qed
-    next
       case False
       have sum2: "\<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 8 + 39 
             = \<Phi> l rkl * 4 + uf_rep_of_c_time (length l) * 4 + uf_rep_of_c_time (length l) * 4 + 39" 
@@ -421,11 +485,27 @@ proof goal_cases
      (\<forall>i<length l'. rep_of l'' i = rep_of l i))" using 1 apply sep_auto
               by (smt assn_times_assoc gc_time le_add1 match_first merge_true_star mult.commute)
             then  show ?case using ent_ex_postI by fast 
-          qed
+          qed 
         qed
       qed   
-    qed
+    qed sep_auto
   qed
+qed
+
+lemma uf_cmp_rule': "\<lbrakk>invar_rank l rkl; i<length l; j<length l\<rbrakk> \<Longrightarrow>
+  <p\<mapsto>\<^sub>al * s\<mapsto>\<^sub>arkl* $(\<Phi> l rkl * 4 + uf_cmp_time (length l) )> 
+  uf_cmp (s,p) i j 
+  <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' * s\<mapsto>\<^sub>arkl
+    *$(\<Phi> l' rkl * 4) * \<up>((r\<longleftrightarrow>(rep_of l i = rep_of l j)) \<and> invar_rank l' rkl
+       \<and> length l' = length l 
+       \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
+proof goal_cases
+  case 1
+  { fix l rkl
+    have "\<Phi> l rkl * 4 = 4* \<Phi> l rkl" by presburger
+  } note sum = this
+  show ?case using 1 apply (subst sum)+ 
+    by (sep_auto heap: uf_cmp_rule[where rkl = rkl])
 qed
 
 
@@ -437,32 +517,91 @@ lemma cnv_to_ufa_\<alpha>_eq:
 lemma "  card (Domain (ufa_\<alpha> l)) = length l"
   by simp
 
+lemma ex_assn_swap: "(\<exists>\<^sub>A a b. P a b) = (\<exists>\<^sub>A b a. P a b)"  
+  apply (subst ex_assn_def) 
+  apply (subst mod_ex_dist) 
+  apply (subst ex_assn_def) 
+  apply (subst mod_ex_dist)  
+  by meson
 
-lemma uf_cmp_rule': "\<lbrakk>invar_rank l rkl\<rbrakk> \<Longrightarrow>
-  <is_uf R u * $(uf_cmp_time (card (Domain R)))> uf_cmp u i j <\<lambda>r. is_uf R u * \<up>(r\<longleftrightarrow>(i,j)\<in>R)>\<^sub>t" 
-  sorry
-  
+lemma ufa_\<alpha>I: "(\<forall>i<length l. rep_of l' i = rep_of l i)\<and> (length l = length l') \<Longrightarrow> (ufa_\<alpha> l' = ufa_\<alpha> l)"
+  unfolding ufa_\<alpha>_def by auto
+    
+
+lemma uf_cmp_rule_abstract:
+  "<is_uf2 R u * $(uf_cmp_time (card (Domain R)))> uf_cmp u i j <\<lambda>r. is_uf2 R u * \<up>(r\<longleftrightarrow>(i,j)\<in>R)>\<^sub>t" 
+  unfolding is_uf2_def 
+  apply (cases u)
+  apply simp
+  apply sep_auto
+proof goal_cases
+  case (1 a b l rkl)
+  then show ?case proof (cases "i< length l \<and> j < length l")
+    case True
+    then show ?thesis using 1  unfolding ufa_\<alpha>_def 
+      apply (vcg heap: uf_cmp_rule')
+      apply auto apply (subst ex_assn_swap)
+      apply (rule ent_ex_postI[where x = rkl]) apply (subst ufa_\<alpha>_def[symmetric])+
+      by (sep_auto simp: ufa_\<alpha>I)
+  next
+    case False
+    have sum1: "(\<Phi> l rkl * 4 + (8 * uf_rep_of_c_time (length l) + 40)) = (\<Phi> l rkl * 4 +
+            (8 * uf_rep_of_c_time (length l) )) + 40" by simp
+    have "i \<ge> length l \<or> j \<ge> length l" using False by auto
+    with 1 show ?thesis unfolding uf_cmp_def uf_cmp_time_def 
+      apply (subst sum1)
+      apply (vcg heap: length_rule)
+      apply sep_auto proof goal_cases
+      case (1 xa h)
+      hence iDom: "i\<notin> Domain R" using 1 ufa_\<alpha>_dom by auto
+      then show ?case using 1(2,8) by fast
+    next
+      case (2 x)
+      then show ?case apply sep_auto proof goal_cases
+        case (1 x' h)
+        hence jDom: "j\<notin> Domain R" using 2 ufa_\<alpha>_dom by auto
+        then show ?case using 1 2(2) by (simp add: 1(8) ufa_\<alpha>_lenD(2))
+      qed
+    next
+      case (3 x)
+      then show ?case by sep_auto
+    qed
+  qed
+qed
 
 subsubsection{*uf_union_lemmas*}
 
 
-definition "uf_union_time n = 11+ height_ub n*2"
+definition "uf_union_time n = 20 + uf_rep_of_c_time2 n * 2"
 
 lemma uf_union_time_bound[asym_bound]: "uf_union_time \<in> \<Theta>(\<lambda>n. ln n)"
   unfolding uf_union_time_def by auto2
 
+
 lemma uf_union_rule: "\<lbrakk>i\<in>Domain R; j\<in> Domain R\<rbrakk> 
-  \<Longrightarrow> <is_uf R u * $(uf_union_time (card (Domain R)))> uf_union u i j <is_uf (per_union R i j)>\<^sub>t"
-  sorry
+  \<Longrightarrow> <is_uf2 R u * $(uf_union_time (card (Domain R)))> uf_union u i j <is_uf (per_union R i j)>\<^sub>t"
+  unfolding uf_union_def
+  apply (cases u)
+  apply (simp add: is_uf2_def[abs_def])
+proof goal_cases
+  case (1 a b)
+  then show ?case 
+    apply(sep_auto heap: uf_rep_of_c_rule2) 
+    apply(simp add: ufa_\<alpha>_lenD)
+  apply simp
+  apply(sep_auto heap: uf_rep_of_rule_ub)
+    apply(simp add: ufa_\<alpha>_lenD)
+   apply simp
+  apply (sep_auto
+    simp: per_union_cmp ufa_\<alpha>_lenD ufa_find_correct
+    rep_of_bound
+    ufa_union_invar
+    ufa_union_correct
+  )
+qed
+  
 
 
-
-(*************************)
-lemma uf_union_rule_alpha: "\<lbrakk>i\<in>Domain R; j\<in> Domain R\<rbrakk> 
-  \<Longrightarrow> <is_uf R u> uf_union u i j <is_uf (per_union R i j)>\<^sub>t"
-  sorry
-
-(*************************)
 
 interpretation UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
 proof (unfold_locales, goal_cases)

@@ -89,8 +89,8 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
 definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf Heap" where 
   "uf_union u i j \<equiv> do {
     let (r,p)=u;
-    ci \<leftarrow> uf_rep_of p i;
-    cj \<leftarrow> uf_rep_of p j;
+    ci \<leftarrow> uf_rep_of_c p i;
+    cj \<leftarrow> uf_rep_of_c p j;
     if (ci=cj) then return (r,p) 
     else do {
       ri \<leftarrow> Array.nth r ci;
