@@ -612,32 +612,220 @@ subsubsection{*uf_union_lemmas*}
 
 definition "uf_union_time n = 20 + uf_rep_of_c_time2 n * 2"
 
+lemma ufa_union_symmetric: "ufa_\<alpha> (ufa_union l i j) = ufa_\<alpha> (ufa_union l j i)" 
+  unfolding ufa_\<alpha>_def sorry
+
+lemma ufa_union_rep_of: assumes "ufa_invar l" "i<length l" "j<length l"
+  shows "ufa_union l i j = ufa_union l (rep_of l i) (rep_of l j)"
+proof -
+  have sub1: "rep_of l (rep_of l i) = rep_of l i" using assms using rep_of_idem by blast
+  have sub2: "rep_of l (rep_of l j) = rep_of l j" using assms using rep_of_idem by blast
+  show ?thesis apply (subst sub1) apply (subst sub2) ..
+qed
+  
+
 lemma uf_union_time_bound[asym_bound]: "uf_union_time \<in> \<Theta>(\<lambda>n. ln n)"
   unfolding uf_union_time_def by auto2
 
 
+
 lemma uf_union_rule: "\<lbrakk>i\<in>Domain R; j\<in> Domain R\<rbrakk> 
-  \<Longrightarrow> <is_uf2 R u * $(uf_union_time (card (Domain R)))> uf_union u i j <is_uf (per_union R i j)>\<^sub>t"
+  \<Longrightarrow> <is_uf2 R u * $(uf_union_time (card (Domain R)))> uf_union u i j <is_uf2 (per_union R i j)>\<^sub>t"
   unfolding uf_union_def
   apply (cases u)
   apply (simp add: is_uf2_def[abs_def])
 proof goal_cases
-  case (1 a b)
+  { fix l::"nat list" and R::"(nat \<times> nat) set"
+    assume "ufa_\<alpha> l = R"
+    have "card (Domain R) = length l"
+      using \<open>ufa_\<alpha> l = R\<close> by auto
+  } note card_swap = this
+  case assms:(1 a b)
   then show ?case 
-    apply(sep_auto heap: uf_rep_of_c_rule2) 
-    apply(simp add: ufa_\<alpha>_lenD)
-  apply simp
-  apply(sep_auto heap: uf_rep_of_rule_ub)
-    apply(simp add: ufa_\<alpha>_lenD)
-   apply simp
-  apply (sep_auto
-    simp: per_union_cmp ufa_\<alpha>_lenD ufa_find_correct
-    rep_of_bound
-    ufa_union_invar
-    ufa_union_correct
-  )
+    apply (vcg (ss))
+    apply (vcg (ss))
+  proof goal_cases
+    case first_ex:(1 l rkl)
+    hence "i<length l" using ufa_\<alpha>_dom[of l] by auto
+    from first_ex have "invar_rank l rkl" by blast
+    from first_ex have " ufa_\<alpha> l = R" by blast
+    show ?case
+      unfolding uf_union_time_def apply (subst card_swap[OF \<open>ufa_\<alpha> l = R\<close>])
+      using  first_ex
+      apply (vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l rkl\<close> \<open>i<length l\<close>, of b])
+      apply safe
+    proof goal_cases
+      case second_ex: (1 b' ba x)
+      then show ?case apply (vcg (ss)) proof goal_cases
+        case second_ex': (1 l')
+        hence "invar_rank l' rkl" by fast
+        from second_ex' have "j<length l'" unfolding ufa_\<alpha>_def by auto
+        from second_ex' have "length l = length l'" by argo
+        show ?case apply (subst \<open>length l = length l'\<close>)
+          using second_ex' 
+          apply (vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l' rkl\<close> \<open>j<length l'\<close>, of b])
+          apply safe
+          apply (vcg (ss))
+          apply (vcg (ss))
+          apply (cases "rep_of l i = rep_of l' j") proof goal_cases
+          case True: (1 xa la)
+          then show ?case apply sep_auto
+          proof goal_cases
+            case (1 h' a' b')
+            then show ?case
+              by (metis \<open>i < length l\<close> \<open>j < length l'\<close> cnv_to_ufa_\<alpha>_eq invar_rank_ufa_invarI 
+                  list_update_id rep_of_min ufa_union_correct)
+          next
+            case (2 h' a' b')
+            then show ?case 
+              by (metis \<open>i < length l\<close> \<open>j < length l'\<close> cnv_to_ufa_\<alpha>_eq invar_rank_ufa_invarI 
+                  list_update_id rep_of_min ufa_union_correct)
+          qed
+        next
+          case False: (2 xa la)
+          {fix i assume "i<length l" have "rep_of l i = rep_of la i" using False 
+              by (simp add: \<open>i < length l\<close>) } note repl = this
+          {fix i assume "i<length l" have "rep_of l' i = rep_of la i" using False 
+              by (simp add: \<open>i < length l\<close>) } note repl = this
+          from False show ?case using \<open>i < length l\<close> \<open>j < length l'\<close> 
+              invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] rep_of_bound 
+            apply vcg
+            apply auto
+            apply vcg
+            apply safe
+          proof goal_cases
+            case res: (1 x\<^sub>3 x\<^sub>4)
+            then show ?case apply (cases "rkl ! rep_of l i < x\<^sub>4") proof goal_cases
+              case True2: 1
+              then show ?case 
+                apply vcg
+                apply auto
+                apply vcg
+                apply auto
+                apply vcg
+                apply auto
+              proof goal_cases
+                case x34: 1
+                then obtain newla where newlaeq: "newla = la[rep_of la i := rep_of la j]" by blast
+                have "b \<mapsto>\<^sub>a la[rep_of la i := rep_of la j] * a \<mapsto>\<^sub>a rkl * true *
+                        $ (\<Phi> la rkl * 4 + 15) \<Longrightarrow>\<^sub>A
+                      b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a rkl * true * $ (\<Phi> newla rkl * 4) *
+                      \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> la) i j \<and>
+                      length rkl = length newla \<and> invar_rank newla rkl)" 
+                  apply (subst newlaeq)+
+                  apply sep_auto proof goal_cases
+                  case (1 h a b)
+                  then show ?case 
+                    using True2(12) True2(13) True2(17) True2(18) 
+                          invar_rank_ufa_invarI ufa_union_correct by auto
+                next
+                  case (2 h a b)
+                  then show ?case 
+                    using True2(12) True2(17) True2(18) True2(9) \<open>j < length l'\<close> 
+                          invar_rank_ufa_invarI ufa_union_correct by auto
+                next
+                  case 3
+                  then show ?case using True2 by argo
+                next
+                  case 4
+                  have "ufa_invar la" using invar_rank_ufa_invarI x34(17) by auto
+                  have "i<length la" by (simp add: x34(12) x34(18)) 
+                  have "j<length la" by (simp add: x34(13) x34(18))
+                  have r1: "rep_of la i < length la"
+                    using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound x34(18) by fastforce
+                  have r2: "rep_of la j < length la"
+                    using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound x34(18) by fastforce
+                  have r3: "rep_of la i = la ! rep_of la i" 
+                    by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                  have r4: "rep_of la j = la ! rep_of la j" 
+                    by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                  have r5: "rep_of la i \<noteq> rep_of la j" 
+                    using False(11) False(12) x34(12) x34(13) x34(16) by auto
+                  have subl: "(ufa_union la (rep_of la i) (rep_of la j)) = 
+                              union_by_rank_l la rkl (rep_of la i) (rep_of la j)"
+                    unfolding union_by_rank_l_def using True2  x34(20,21) by (simp cong: if_cong)
+                  have subrkl: "rkl = union_by_rank_rkl rkl (rep_of la i) (rep_of la j)" 
+                    unfolding union_by_rank_rkl_def using True2  x34(20,21) by (simp cong: if_cong)
+                  have ev: "evolution la rkl (ufa_union la (rep_of la i) (rep_of la j)) rkl"
+                    apply (subst (2) subrkl) apply (subst subl) using 
+                    EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .     
+                  show ?case  
+                    apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>i<length la\<close> \<open>j<length la\<close>])
+                    using  invar_rank_evolution[OF \<open>invar_rank la rkl\<close> ev] .
+                next
+                  case 5
+                  have "ufa_invar la" using invar_rank_ufa_invarI x34(17) by auto
+                  have "i<length la" by (simp add: x34(12) x34(18)) 
+                  have "j<length la" by (simp add: x34(13) x34(18))
+                  have r1: "rep_of la i < length la"
+                    using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound x34(18) by fastforce
+                  have r2: "rep_of la j < length la"
+                    using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound x34(18) by fastforce
+                  have r3: "rep_of la i = la ! rep_of la i" 
+                    by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                  have r4: "rep_of la j = la ! rep_of la j" 
+                    by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                  have r5: "rep_of la i \<noteq> rep_of la j" 
+                    using False(11) False(12) x34(12) x34(13) x34(16) by auto
+                  have subl: "(ufa_union la (rep_of la i) (rep_of la j)) = 
+                              union_by_rank_l la rkl (rep_of la i) (rep_of la j)"
+                    unfolding union_by_rank_l_def using True2  x34(20,21) by (simp cong: if_cong)
+                  have subrkl: "rkl = union_by_rank_rkl rkl (rep_of la i) (rep_of la j)" 
+                    unfolding union_by_rank_rkl_def using True2  x34(20,21) by (simp cong: if_cong)
+                  have ev: "evolution la rkl (ufa_union la (rep_of la i) (rep_of la j)) rkl"
+                    apply (subst (2) subrkl) apply (subst subl) using 
+                    EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .  
+                  have ineq: "(\<Phi> (ufa_union la (rep_of la i) (rep_of la j)) rkl * 4) \<le> (\<Phi> la rkl * 4 + 15)"
+                    using 
+                      potential_increase_during_link[OF \<open>invar_rank la rkl\<close>,
+                         of "rep_of la i" "rep_of la j" _ rkl, OF \<open>rep_of la i \<noteq> rep_of la j\<close>
+                         \<open>rep_of la i < length la\<close> \<open>rep_of la j < length la\<close> \<open>rep_of la i = la ! rep_of la i\<close>
+                         \<open>rep_of la j = la ! rep_of la j\<close> subl subrkl]  by linarith
+                  show ?case
+                    apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>i<length la\<close> \<open>j<length la\<close>])+
+                    using ineq 
+                    by (smt \<open>j < length l'\<close> gc_time match_first merge_true_star mult.assoc 
+                        mult.commute star_aci(3) subl time_credit_add x34(12,16,19,7,9))
+                qed
+                hence "b \<mapsto>\<^sub>a la[rep_of l i := rep_of l j] * a \<mapsto>\<^sub>a rkl * true *
+                        $ (\<Phi> la rkl * 4 + 15) \<Longrightarrow>\<^sub>A
+                       b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a rkl * true * $ (\<Phi> newla rkl * 4) *
+                      \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> l) i j \<and>
+                      length rkl = length newla \<and> invar_rank newla rkl)" 
+                  by (metis True2(12) True2(13) True2(18) True2(19) cnv_to_ufa_\<alpha>_eq)
+                then show ?case using newlaeq by sep_auto
+              qed
+            next
+              case False2: 2
+              then show ?case
+                apply vcg
+                apply (cases "rkl ! rep_of l i = rkl ! rep_of l j") proof goal_cases
+                case True3: 1
+                then show ?case 
+                  apply vcg
+                  apply auto
+                  apply vcg
+                  apply auto
+                  apply vcg
+                  apply auto
+                  sorry
+              next
+                case False3: 2
+                then show ?case
+                  apply vcg
+                  apply auto
+                  apply vcg
+                  apply auto
+                  sorry
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
 qed
-  
+
 
 
 
