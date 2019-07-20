@@ -1833,6 +1833,17 @@ inductive fw_ipc
 | FWIPCStep: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> fw_ipc (l[x:= rep_of l y]) y i l' \<Longrightarrow> fw_ipc l x (Suc i) l'"
 
 
+lemma bw_ipc_root_unique:
+  assumes "x = l!x" "bw_ipc l x i l'"
+  shows "i = 0 \<and> l' = l"
+  using assms(2,1) proof (induction rule: bw_ipc.induct)
+  case (BWIPCBase x l)
+  then show ?case by blast
+next
+  case (BWIPCStep x y l i l')
+  then show ?case unfolding ufa_\<beta>_start_def by blast
+qed
+
 lemma ipc_defined:
   assumes "ufa_invar l"
   shows "\<exists> i l'. bw_ipc l x i l'"

@@ -294,6 +294,60 @@ proof -
 qed
 
 
+
+lemma uf_compress_rule_explicit: assumes "invar_rank l rkl" "i<length l" "ci=rep_of l i" "bw_ipc l i d l'"
+  shows "  <p\<mapsto>\<^sub>al *  $(1+d*3)> uf_compress i ci p 
+  <\<lambda>_. (p\<mapsto>\<^sub>al' * \<up>(invar_rank l' rkl \<and> length l' = length l 
+     \<and> (\<forall>i<length l. rep_of l' i = rep_of l i)) )>\<^sub>t"
+  using assms(4,1-3)
+proof (induction rule: bw_ipc.induct)
+  case (BWIPCBase x l)
+  hence "x = rep_of l x" using rep_of_refl by auto
+  with BWIPCBase show ?case apply (subst uf_compress.simps) by sep_auto
+next
+  case (BWIPCStep x y l i l')
+  hence "y<length l" unfolding ufa_\<beta>_start_def by fast
+  have "ufa_invar l" using invar_rank_ufa_invarI[OF BWIPCStep(4)] .
+  hence "ci<length l" using BWIPCStep rep_of_bound by auto
+  have "(x,y)\<in> (ufa_\<beta>_start l)\<^sup>*" using BWIPCStep by blast
+  have "y = l!x" using BWIPCStep(1) unfolding ufa_\<beta>_start_def by blast
+  have "rep_of l y = ci" 
+    using rep_of_invar_along_path[OF \<open>ufa_invar l\<close> \<open>ci<length l\<close> \<open>y<length l\<close> \<open>x<length l\<close> 
+        \<open>ci=rep_of l x\<close> \<open>(x,y)\<in> (ufa_\<beta>_start l)\<^sup>*\<close>] by blast
+  have ipcx: "bw_ipc l x (Suc i) (l'[x := rep_of l' x])" using  bw_ipc.intros(2)[OF BWIPCStep(1,2)] .
+  have IH: "<p \<mapsto>\<^sub>a l *
+   $ (1 + i * 3)> uf_compress (l!x) ci p <\<lambda>r. p \<mapsto>\<^sub>a l' *
+   \<up> (invar_rank l' rkl \<and> length l' = length l \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t" 
+    using BWIPCStep(3)[OF \<open>invar_rank l rkl\<close> \<open>y<length l\<close> \<open>rep_of l y = ci\<close>[symmetric]] \<open>y = l!x\<close> by blast
+  show ?case apply (subst uf_compress.simps)
+    apply (cases "x = ci") proof (goal_cases)
+    case 1
+    hence "x = l!x" using \<open>ci = rep_of l x\<close> BWIPCStep.prems(2) \<open>ufa_invar l\<close> rep_of_min by fastforce
+    have "bw_ipc l x 0 l" using  bw_ipc.intros(1)[OF \<open>x = l!x\<close>] .
+    hence " Suc i = 0" "l'[x := rep_of l' x] = l" 
+      using bw_ipc_root_unique[OF \<open>x = l!x\<close> \<open>bw_ipc l x (Suc i) (l'[x := rep_of l' x])\<close>]  by auto
+    then show ?case using BWIPCStep(1,2,4,5,6) ipcx by sep_auto
+  next
+    case 2
+    with 2 show ?case using \<open>x<length l\<close> apply vcg   apply safe 
+      apply (sep_auto heap: IH) proof goal_cases
+      case (1 h)
+      hence "x<length l'" using \<open>x<length l\<close> by argo
+      with 1 have "rep_of l' x = rep_of l x" by blast
+      then show ?case using compress_invar_rank[OF \<open>invar_rank l' rkl\<close> \<open>x<length l'\<close>] 
+        using 1 by argo
+    next
+      case (2 i)
+      have "ufa_invar l'" using invar_rank_ufa_invarI[OF \<open>invar_rank l' rkl\<close>] .
+      with 2 show ?case using ufa_compress_aux(2) by force
+    next
+      case 3
+      then show ?case using \<open>ci = rep_of l x\<close> by sep_auto
+    qed
+  qed
+qed
+
+
 subsubsection{*uf_rep_of_c lemmas*}
 
 
@@ -329,7 +383,7 @@ lemma uf_compress_same_rule:
   
 
 
-lemma uf_rep_of_c_rule': "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
+lemma uf_rep_of_c_rule_explicit: "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  p\<mapsto>\<^sub>al' 
     * \<up>(r=rep_of l i \<and> invar_rank l' rkl
        \<and> length l' = length l 
@@ -338,29 +392,13 @@ proof goal_cases
   case 1
   note assms= 1
   have "ufa_invar l" using invar_rank_ufa_invarI[OF 1(1)] .
-  show ?case using 1(3,1,2) \<open>ufa_invar l\<close> proof (induction rule: bw_ipc.induct)
-    case (BWIPCBase x l)
-    have "rep_of l x = x" using BWIPCBase using rep_of_refl by auto
-    hence "height_of l x = 0" using h_rep[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] by argo
-    hence uf_rep_of_spec: "<p \<mapsto>\<^sub>a l * $ 2> uf_rep_of p x <\<lambda>r. p \<mapsto>\<^sub>a l * \<up> (r = rep_of l x)>\<^sub>t" 
-      using uf_rep_of_rule[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>, of p]
-      apply (subst(asm) \<open>height_of l x = 0\<close>) apply (subst(asm) \<open>height_of l x = 0\<close>)
-      apply simp apply (subst (asm) numeral_2_eq_2[symmetric]) by blast
-    show ?case unfolding uf_rep_of_c_def 
-      apply (vcg heap: uf_rep_of_spec)
-      apply safe using \<open>height_of l x = 0\<close>
-    proof goal_cases
-      case (1 x')
-      show ?case using \<open>rep_of l x = x\<close> \<open>invar_rank l rkl\<close> by (sep_auto heap: uf_compress_same_rule)
-    qed
-  next
-    case (BWIPCStep x y l i l')
-    hence "y<length l" unfolding ufa_\<beta>_start_def by fast
-    note step= BWIPCStep(1,2,4,5) \<open>y<length l\<close> BWIPCStep(6) 
-               height_of_ipc_equiv[OF \<open>bw_ipc l y i l'\<close> \<open>ufa_invar l\<close> \<open>y<length l\<close>]
-    note IH = BWIPCStep(3)[OF \<open>invar_rank l rkl\<close> \<open>y<length l\<close> \<open>ufa_invar l\<close>]
-    then show ?case using step sorry
-  qed
+  show ?case unfolding uf_rep_of_c_def 
+    apply (subst height_of_ipc_equiv[OF assms(3) \<open>ufa_invar l\<close> assms(2)])
+    using assms \<open>ufa_invar l\<close>
+    apply (vcg heap: uf_rep_of_rule)
+    apply safe
+    apply (subst height_of_ipc_equiv[OF assms(3) \<open>ufa_invar l\<close> assms(2), symmetric])
+    apply (vcg heap: uf_compress_rule_explicit[where d = d]) by sep_auto
 qed
 
 definition uf_rep_of_c_time where "uf_rep_of_c_time n = 2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4"
@@ -379,7 +417,7 @@ proof goal_cases
   hence potentialjump: "4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) \<ge> 4*\<Phi> l' rkl + d*4 + 4" 
     unfolding uf_rep_of_c_time_def by fastforce
   show ?case apply (rule frame_credits) apply (rule potentialjump) using 1 bw(1)
-    by (sep_auto heap: uf_rep_of_c_rule'[where d=d]) 
+    by (sep_auto heap: uf_rep_of_c_rule_explicit[where d=d]) 
 qed
 
 definition uf_rep_of_c_time2 where "uf_rep_of_c_time2 n = 4* (2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4)"
