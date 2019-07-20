@@ -374,8 +374,6 @@ proof goal_cases
   by (sep_auto  heap: uf_rep_of_rule uf_compress_rule')
 qed
 
-lemma frame_credits: "\<lbrakk> t'\<le>t; <P * $t'> f <Q>\<^sub>t \<rbrakk> \<Longrightarrow> <P * $t> f <Q>\<^sub>t" sorry
-
 lemma uf_compress_same_rule:  
  "  <p\<mapsto>\<^sub>al *  $1> uf_compress i i p <\<lambda>_. p\<mapsto>\<^sub>al>\<^sub>t"
   apply (subst uf_compress.simps)
@@ -403,8 +401,6 @@ qed
 
 definition uf_rep_of_c_time where "uf_rep_of_c_time n = 2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4"
 
-
-
 lemma uf_rep_of_c_rule''': "\<lbrakk>invar_rank l rkl; i<length l\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) )> uf_rep_of_c p i <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
     *$(4* \<Phi> l' rkl) * \<up>(r=rep_of l i \<and> invar_rank l' rkl
@@ -416,9 +412,18 @@ proof goal_cases
       amortized_cost_of_iterated_path_compression_global[OF 1(1,2)] by blast
   hence potentialjump: "4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) \<ge> 4*\<Phi> l' rkl + d*4 + 4" 
     unfolding uf_rep_of_c_time_def by fastforce
-  show ?case apply (rule frame_credits) apply (rule potentialjump) using 1 bw(1)
-    by (sep_auto heap: uf_rep_of_c_rule_explicit[where d=d]) 
+  hence potentialjump': "\<not> (4*(\<Phi> l rkl + uf_rep_of_c_time (length l)) < 4*\<Phi> l' rkl + d*4 + 4)" by linarith
+  have sep: "4 * (\<Phi> l rkl + uf_rep_of_c_time (length l)) = 4 * \<Phi> l' rkl + d * 4 + 4 +
+  (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l)) - (4 * \<Phi> l' rkl + d * 4 + 4))" 
+    using add_diff_inverse[OF potentialjump', symmetric] .
+  show ?case apply (subst sep) 
+    apply (vcg heap: uf_rep_of_c_rule_explicit[where d=d, where rkl =rkl,where  l' = l'])
+    using 1 bw apply auto 
+    apply (subst (10) mult.commute)
+    by sep_auto
 qed
+
+    
 
 definition uf_rep_of_c_time2 where "uf_rep_of_c_time2 n = 4* (2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4)"
 
@@ -612,8 +617,6 @@ subsubsection{*uf_union_lemmas*}
 
 definition "uf_union_time n = 20 + uf_rep_of_c_time2 n * 2"
 
-lemma ufa_union_symmetric: "ufa_\<alpha> (ufa_union l i j) = ufa_\<alpha> (ufa_union l j i)" 
-  unfolding ufa_\<alpha>_def sorry
 
 lemma ufa_union_rep_of: assumes "ufa_invar l" "i<length l" "j<length l"
   shows "ufa_union l i j = ufa_union l (rep_of l i) (rep_of l j)"
@@ -686,7 +689,7 @@ proof goal_cases
           {fix i assume "i<length l" have "rep_of l i = rep_of la i" using False 
               by (simp add: \<open>i < length l\<close>) } note repl = this
           {fix i assume "i<length l" have "rep_of l' i = rep_of la i" using False 
-              by (simp add: \<open>i < length l\<close>) } note repl = this
+              by (simp add: \<open>i < length l\<close>) } note repl' = this
           from False show ?case using \<open>i < length l\<close> \<open>j < length l'\<close> 
               invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] rep_of_bound 
             apply vcg
@@ -717,12 +720,12 @@ proof goal_cases
                   case (1 h a b)
                   then show ?case 
                     using True2(12) True2(13) True2(17) True2(18) 
-                          invar_rank_ufa_invarI ufa_union_correct by auto
+                      invar_rank_ufa_invarI ufa_union_correct by auto
                 next
                   case (2 h a b)
                   then show ?case 
                     using True2(12) True2(17) True2(18) True2(9) \<open>j < length l'\<close> 
-                          invar_rank_ufa_invarI ufa_union_correct by auto
+                      invar_rank_ufa_invarI ufa_union_correct by auto
                 next
                   case 3
                   then show ?case using True2 by argo
@@ -748,7 +751,7 @@ proof goal_cases
                     unfolding union_by_rank_rkl_def using True2  x34(20,21) by (simp cong: if_cong)
                   have ev: "evolution la rkl (ufa_union la (rep_of la i) (rep_of la j)) rkl"
                     apply (subst (2) subrkl) apply (subst subl) using 
-                    EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .     
+                      EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .     
                   show ?case  
                     apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>i<length la\<close> \<open>j<length la\<close>])
                     using  invar_rank_evolution[OF \<open>invar_rank la rkl\<close> ev] .
@@ -774,13 +777,13 @@ proof goal_cases
                     unfolding union_by_rank_rkl_def using True2  x34(20,21) by (simp cong: if_cong)
                   have ev: "evolution la rkl (ufa_union la (rep_of la i) (rep_of la j)) rkl"
                     apply (subst (2) subrkl) apply (subst subl) using 
-                    EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .  
+                      EvUnion[OF \<open>rep_of la i < length la\<close> \<open>rep_of la j<length la\<close> r3 r4 r5, of rkl] .  
                   have ineq: "(\<Phi> (ufa_union la (rep_of la i) (rep_of la j)) rkl * 4) \<le> (\<Phi> la rkl * 4 + 15)"
                     using 
                       potential_increase_during_link[OF \<open>invar_rank la rkl\<close>,
-                         of "rep_of la i" "rep_of la j" _ rkl, OF \<open>rep_of la i \<noteq> rep_of la j\<close>
-                         \<open>rep_of la i < length la\<close> \<open>rep_of la j < length la\<close> \<open>rep_of la i = la ! rep_of la i\<close>
-                         \<open>rep_of la j = la ! rep_of la j\<close> subl subrkl]  by linarith
+                        of "rep_of la i" "rep_of la j" _ rkl, OF \<open>rep_of la i \<noteq> rep_of la j\<close>
+                        \<open>rep_of la i < length la\<close> \<open>rep_of la j < length la\<close> \<open>rep_of la i = la ! rep_of la i\<close>
+                        \<open>rep_of la j = la ! rep_of la j\<close> subl subrkl]  by linarith
                   show ?case
                     apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>i<length la\<close> \<open>j<length la\<close>])+
                     using ineq 
@@ -808,7 +811,115 @@ proof goal_cases
                   apply auto
                   apply vcg
                   apply auto
-                  sorry
+                proof goal_cases
+                  case 1
+                  obtain newla where newlaeq: "newla = la[rep_of la j := rep_of la i]" by blast
+                  obtain newrkl where newrkleq: "newrkl = rkl[rep_of la i := Suc (rkl ! rep_of la j)]" by blast
+                  have sg1: "a \<mapsto>\<^sub>a rkl[rep_of la i := Suc (rkl ! rep_of la j)] *
+                        b \<mapsto>\<^sub>a la[rep_of la j := rep_of la i] * true * $ (\<Phi> la rkl * 4 + 15) \<Longrightarrow>\<^sub>A
+                        b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a newrkl * true * $ (\<Phi> newla newrkl * 4) *
+                        \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> la) i j \<and>
+                        length newrkl = length newla \<and> invar_rank newla newrkl)" 
+                    apply (subst newlaeq)+
+                    apply (subst newrkleq)+
+                    apply sep_auto proof goal_cases
+                    case (1 h' a' b')
+                    then show ?case
+                      using invar_rank_ufa_invarI res(12,13,17,18) ufa_union_correct 
+                      by force
+                  next
+                    case (2 h' a' b')
+                    then show ?case 
+                      using \<open>j < length l'\<close> invar_rank_ufa_invarI res(12,17,18,9) ufa_union_correct 
+                      by force
+                  next
+                    case 3
+                    then show ?case by (simp add: res(18) second_ex'(5))
+                  next
+                    case 4
+                    have "ufa_invar la" using invar_rank_ufa_invarI res(17) by auto
+                    have "i<length la" by (simp add: res(12) res(18)) 
+                    have "j<length la" by (simp add: res(13) res(18))
+                    have r1: "rep_of la i < length la"
+                      using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r2: "rep_of la j < length la" 
+                      using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r3: "rep_of la i = la ! rep_of la i" 
+                      by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r4: "rep_of la j = la ! rep_of la j" 
+                      by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r5: "rep_of la i \<noteq> rep_of la j" 
+                      using False(11) False(12) res(12) res(13) res(16) by auto
+                    have subl: "(ufa_union la (rep_of la j) (rep_of la i)) = 
+                        union_by_rank_l la rkl (rep_of la i) (rep_of la j)" 
+                      using \<open>\<not> rkl ! rep_of l i < rkl ! rep_of l j\<close> unfolding union_by_rank_l_def 
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have subrkl: "rkl[rep_of la i := Suc (rkl ! rep_of la j)] = 
+                                  union_by_rank_rkl rkl (rep_of la i) (rep_of la j)"
+                      unfolding union_by_rank_rkl_def using \<open>rkl ! rep_of l i = rkl ! rep_of l j\<close>
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have ev: "evolution la rkl (union_by_rank_l la rkl (rep_of la i) (rep_of la j))
+                      (union_by_rank_rkl rkl (rep_of la i) (rep_of la j))"
+                      using EvUnion[OF r1 r2 r3 r4 r5, of rkl] .
+                    show ?case 
+                      apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>j<length la\<close> \<open>i<length la\<close>]) 
+                      apply (subst subl) apply (subst subrkl)
+                      using invar_rank_evolution[OF \<open>invar_rank la rkl\<close> ev] .
+                  next
+                    case 5
+                    have "ufa_invar la" using invar_rank_ufa_invarI res(17) by auto
+                    have "i<length la" by (simp add: res(12) res(18)) 
+                    have "j<length la" by (simp add: res(13) res(18))
+                    have r1: "rep_of la i < length la"
+                      using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r2: "rep_of la j < length la" 
+                      using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r3: "rep_of la i = la ! rep_of la i" 
+                      by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r4: "rep_of la j = la ! rep_of la j" 
+                      by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r5: "rep_of la i \<noteq> rep_of la j" 
+                      using False(11) False(12) res(12) res(13) res(16) by auto
+                    have subl: "(ufa_union la (rep_of la j) (rep_of la i)) = 
+                        union_by_rank_l la rkl (rep_of la i) (rep_of la j)" 
+                      using \<open>\<not> rkl ! rep_of l i < rkl ! rep_of l j\<close> unfolding union_by_rank_l_def 
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have subrkl: "rkl[rep_of la i := Suc (rkl ! rep_of la j)] = 
+                                  union_by_rank_rkl rkl (rep_of la i) (rep_of la j)"
+                      unfolding union_by_rank_rkl_def using \<open>rkl ! rep_of l i = rkl ! rep_of l j\<close>
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have ev: "evolution la rkl (union_by_rank_l la rkl (rep_of la i) (rep_of la j))
+                      (union_by_rank_rkl rkl (rep_of la i) (rep_of la j))"
+                      using EvUnion[OF r1 r2 r3 r4 r5, of rkl] .
+                    have ineq: "\<Phi> (la[rep_of l j := rep_of l i]) 
+                             (rkl[rep_of la i := Suc (rkl ! rep_of la j)]) * 4 \<le> \<Phi> la rkl * 4 + 15"
+                      using potential_increase_during_link[OF \<open>invar_rank la rkl\<close> _ _ _ _ _ subl
+                          subrkl, OF r5 r1 r2 r3 r4 ]
+                      apply (subst repl[OF res(13)])apply (subst repl[OF res(12)])
+                      apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>j<length la\<close> \<open>i<length la\<close>])
+                      by linarith
+                    show ?case 
+                      apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>j<length la\<close> \<open>i<length la\<close>])+ 
+                      using ineq
+                      by (smt gc_time match_first merge_true_star mult.assoc mult.commute
+                          r3 r4 rep_of_simps(1) res(12,13,19))
+                  qed
+                  have "a \<mapsto>\<^sub>a rkl[rep_of l i := Suc (rkl ! rep_of l j)] *
+                        b \<mapsto>\<^sub>a la[rep_of l j := rep_of l i] * true * $ (\<Phi> la rkl * 4 + 15) \<Longrightarrow>\<^sub>A
+                        b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a newrkl * true * $ (\<Phi> newla newrkl * 4) *
+                        \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> l) i j \<and>
+                        length newrkl = length newla \<and> invar_rank newla newrkl)"
+                    apply (subst repl[OF res(13)])+ apply (subst repl[OF res(12)])+
+                    using  ufa_union_correct newlaeq
+                    apply (simp add: res)
+                    by (smt cnv_to_ufa_\<alpha>_eq ent_pure_post_iff length_list_update newrkleq 
+                        res(12,13,19) second_ex'(5) sg1)
+                  then show ?case by sep_auto
+                qed
               next
                 case False3: 2
                 then show ?case
@@ -816,7 +927,104 @@ proof goal_cases
                   apply auto
                   apply vcg
                   apply auto
-                  sorry
+                proof goal_cases
+                  case 1
+                  obtain newla where newlaeq: "newla = la[rep_of l j := rep_of l i]" by blast
+                  have "b \<mapsto>\<^sub>a la[rep_of la j := rep_of la i] * a \<mapsto>\<^sub>a rkl * true *
+                          $ (\<Phi> la rkl * 4 + 16) \<Longrightarrow>\<^sub>A
+                        b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a rkl * true * $ (\<Phi> newla rkl * 4) *
+                        \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> l) i j \<and>
+                        length rkl = length newla \<and> invar_rank newla rkl)" 
+                    apply (subst newlaeq)+
+                    apply sep_auto proof goal_cases
+                    case (1 h' a' b')
+                    then show ?case
+                      by (metis False(11) cnv_to_ufa_\<alpha>_eq invar_rank_ufa_invarI per_union_commute 
+                          res(12) res(13) ufa_union_correct)
+                  next
+                    case (2 h' a' b')
+                    then show ?case 
+                      by (metis cnv_to_ufa_\<alpha>_eq invar_rank_ufa_invarI per_union_commute 
+                          res(12) res(13) res(17) res(18) res(19) ufa_union_correct)
+                  next
+                    case 3
+                    then show ?case by (simp add: res(18) second_ex'(5))
+                  next
+                    case 4
+                    have "ufa_invar la" using invar_rank_ufa_invarI res(17) by auto
+                    have "i<length la" by (simp add: res(12) res(18)) 
+                    have "j<length la" by (simp add: res(13) res(18))
+                    have r1: "rep_of la i < length la"
+                      using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r2: "rep_of la j < length la" 
+                      using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r3: "rep_of la i = la ! rep_of la i" 
+                      by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r4: "rep_of la j = la ! rep_of la j" 
+                      by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r5: "rep_of la i \<noteq> rep_of la j" 
+                      using False(11) False(12) res(12) res(13) res(16) by auto
+                    have subl: "(ufa_union la (rep_of la j) (rep_of la i)) = 
+                        union_by_rank_l la rkl (rep_of la i) (rep_of la j)" 
+                      using \<open>\<not> rkl ! rep_of l i < rkl ! rep_of l j\<close> unfolding union_by_rank_l_def 
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have subrkl: "rkl = union_by_rank_rkl rkl (rep_of la i) (rep_of la j)"
+                      unfolding union_by_rank_rkl_def using \<open>rkl ! rep_of l i \<noteq> rkl ! rep_of l j\<close>
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have ev: "evolution la rkl (union_by_rank_l la rkl (rep_of la i) (rep_of la j))
+                      (union_by_rank_rkl rkl (rep_of la i) (rep_of la j))"
+                      using EvUnion[OF r1 r2 r3 r4 r5, of rkl] .
+                    show ?case apply (subst repl[OF res(13)])  apply (subst repl[OF res(12)]) 
+                      apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>j<length la\<close> \<open>i<length la\<close>]) 
+                      apply (subst subl) apply (subst (2) subrkl)
+                      using invar_rank_evolution[OF \<open>invar_rank la rkl\<close> ev] .
+                  next
+                    case 5
+                    have "ufa_invar la" using invar_rank_ufa_invarI res(17) by auto
+                    have "i<length la" by (simp add: res(12) res(18)) 
+                    have "j<length la" by (simp add: res(13) res(18))
+                    have r1: "rep_of la i < length la"
+                      using \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r2: "rep_of la j < length la" 
+                      using \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_bound by blast
+                    have r3: "rep_of la i = la ! rep_of la i" 
+                      by (simp add: \<open>i < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r4: "rep_of la j = la ! rep_of la j" 
+                      by (simp add: \<open>j < length la\<close> \<open>ufa_invar la\<close> rep_of_min)
+                    have r5: "rep_of la i \<noteq> rep_of la j" 
+                      using False(11) False(12) res(12) res(13) res(16) by auto
+                    have subl: "(ufa_union la (rep_of la j) (rep_of la i)) = 
+                        union_by_rank_l la rkl (rep_of la i) (rep_of la j)" 
+                      using \<open>\<not> rkl ! rep_of l i < rkl ! rep_of l j\<close> unfolding union_by_rank_l_def 
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have subrkl: "rkl = union_by_rank_rkl rkl (rep_of la i) (rep_of la j)"
+                      unfolding union_by_rank_rkl_def using \<open>rkl ! rep_of l i \<noteq> rkl ! rep_of l j\<close>
+                      apply (subst (asm) repl[OF res(13)]) apply (subst (asm) repl[OF res(12)])
+                      by (simp cong: if_cong)
+                    have ev: "evolution la rkl (union_by_rank_l la rkl (rep_of la i) (rep_of la j))
+                      (union_by_rank_rkl rkl (rep_of la i) (rep_of la j))"
+                      using EvUnion[OF r1 r2 r3 r4 r5, of rkl] .
+                    have ineq: "\<Phi> (la[rep_of l j := rep_of l i]) rkl * 4 \<le> \<Phi> la rkl * 4 + 16 "
+                      using potential_increase_during_link[OF \<open>invar_rank la rkl\<close>, of "rep_of la i" 
+                          "rep_of la j" "(ufa_union la (rep_of la j) (rep_of la i))" rkl, OF r5 r1 r2
+                          r3 r4 subl subrkl] apply (subst repl[OF res(13)])apply (subst repl[OF res(12)])
+                      apply (subst ufa_union_rep_of[OF \<open>ufa_invar la\<close> \<open>j<length la\<close> \<open>i<length la\<close>])
+                      by linarith
+                    then show ?case 
+                      by (smt False(11) \<open>j < length l'\<close> gc_time match_first merge_true_star 
+                          mult.commute newlaeq res(12) res(16) res(9) star_aci(3) time_credit_add)
+                  qed
+                  hence "b \<mapsto>\<^sub>a la[rep_of l j := rep_of l i] * a \<mapsto>\<^sub>a rkl * true *
+                          $ (\<Phi> la rkl * 4 + 16) \<Longrightarrow>\<^sub>A
+                         b \<mapsto>\<^sub>a newla * a \<mapsto>\<^sub>a rkl * true * $ (\<Phi> newla rkl * 4) *
+                         \<up> (ufa_\<alpha> newla = per_union (ufa_\<alpha> l) i j \<and>
+                         length rkl = length newla \<and> invar_rank newla rkl)" 
+                    by (simp add: res(12) res(13) res(19))
+                  then show ?case by sep_auto
+                qed
               qed
             qed
           qed
