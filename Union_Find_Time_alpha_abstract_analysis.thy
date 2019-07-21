@@ -2152,7 +2152,7 @@ context \<comment>\<open>invar_rank\<close>
   assumes contextasm: "invar_rank l rkl"
 begin
 
-interpretation pl: Pleasant top_part level .
+
 
 
 lemma top_part_hereditary:
@@ -2166,7 +2166,9 @@ proof -
     by (smt \<open>ufa_invar l\<close> case_prodD mem_Collect_eq rep_of_bound rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
   have h4: "rep_of l x = rep_of l y" using assms \<open>ufa_invar l\<close> rep_of_idx 
       unfolding ufa_\<beta>_start_def by force
-  thus ?thesis unfolding top_part_def
+    thus ?thesis unfolding top_part_def 
+      sorry
+  qed
   
 
 
@@ -2180,6 +2182,17 @@ proof -
   show ?thesis using assms(2)
   unfolding top_part_def 
   sorry 
+qed
+
+end \<comment>\<open>invar_rank\<close>
+
+interpretation pl: Pleasant top_part level .
+
+
+context \<comment>\<open>invar_rank\<close>
+  fixes l::"nat list" and rkl::"nat list"
+  assumes contextasm: "invar_rank l rkl"
+begin
 
 
 \<comment>\<open>The proof of Lemma 4.11 says this is a strict inequality. This is
@@ -2248,6 +2261,12 @@ lemma arbitrary_\<Phi>:
   by (metis atLeastLessThan_iff compress_evolution contextasm eq_iff list_update_beyond 
       list_update_id not_le_imp_less rep_of_refl sum_mono)
 
+end  \<comment>\<open>invar_rank\<close>
+
+context \<comment>\<open>invar_rank\<close>
+  fixes l::"nat list" and rkl::"nat list"
+  assumes contextasm: "invar_rank l rkl"
+begin
 
 \<comment>\<open>We now evaluate the amortized cost of path compression in the "top part" of the path. \<close>
 
@@ -2255,7 +2274,76 @@ lemma arbitrary_\<Phi>:
 lemma amortized_cost_fw_ipc_top_part_inductive:
   assumes "fw_ipc l x i l'" "top_part l rkl x"
   shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + pl.displeasure l rkl x"
-  sorry
+  unfolding pl.displeasure_def[OF contextasm]
+  using assms contextasm
+proof (induction)
+  case (FWIPCBase x l)
+  then show ?case by linarith
+next
+  case step: (FWIPCStep x y l i l')
+  have "x<length l" "y<length l"  
+    using step  unfolding ufa_\<beta>_start_def by auto 
+  have "invar_rank (l[x := rep_of l y]) rkl" 
+    using  invar_rank_evolution[OF \<open>invar_rank l rkl\<close>  EvCompress[OF step(1), of rkl]] .
+  have "rep_of l x < length l" using 
+      rep_of_bound[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] \<open>x<length l\<close>] .
+  have eq: "rep_of l y = rep_of l x"  
+    apply (subst rep_of_path_iff[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] 
+                                 \<open>rep_of l x<length l\<close> \<open>y<length l\<close>])
+    apply safe
+    using step(1) rep_of_ufa_\<beta>_refl[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] \<open>x<length l\<close>]
+     apply (metis \<open>rep_of l x < length l\<close> \<open>x < length l\<close> \<open>y < length l\<close> invar_rank_ufa_invarI 
+            r_into_rtrancl rep_of_invar_along_path rep_of_path_iff step.prems(2))
+    using \<open>x < length l\<close> invar_rank_ufa_invarI rep_of_min step.prems by blast
+
+  have step': " (x, y) \<in> ufa_\<beta>_start l" "fw_ipc (l[x := rep_of l x]) y i l'"
+            "\<lbrakk>top_part (l[x := rep_of l x]) rkl y; invar_rank (l[x := rep_of l x]) rkl\<rbrakk>
+             \<Longrightarrow> \<Phi> l' rkl + i \<le> \<Phi> (l[x := rep_of l x]) rkl +
+                                 card (pl.unpleasant_ancestors (l[x := rep_of l x]) rkl y)" 
+                "top_part l rkl x" "invar_rank l rkl" using step by (auto simp add: eq)
+
+  have dpleq: "pl.displeasure (l[x := rep_of l y]) rkl y
+      \<le> pl.displeasure l rkl y" 
+    apply (rule pl.compress_preserves_displeasure_of_y[of x y l rkl, OF _ _ step'(1)])
+  proof goal_cases
+    case (1 x y l v rkl)
+    then show ?case sorry
+  next
+    case (2 x' y' l' v rkl)
+    then show ?case unfolding top_part_def sorry
+  qed
+
+  have ir':"invar_rank (l[x := rep_of l x]) rkl" using
+        invar_rank_evolution[OF \<open>invar_rank l rkl\<close> EvCompress[OF step'(1), of rkl]] eq by argo
+  have sub1: "rep_of (l[x := rep_of l x]) y = rep_of l x" using \<open>rep_of l y = rep_of l x\<close>
+        using \<open>x < length l\<close> \<open>y < length l\<close> invar_rank_ufa_invarI step.prems ufa_compress_aux(2) by auto
+  have tpy: "top_part (l[x := rep_of l x]) rkl y" 
+        using top_part_hereditary[OF \<open>invar_rank l rkl\<close> step'(4) step'(1)] 
+        unfolding top_part_def 
+        apply (subst sub1) apply(subst eq[symmetric]) .  
+  note IH' = step'(3)[OF tpy ir']
+
+  then show ?case proof (cases "pl.pleasant l rkl x")
+    case True
+    have "x \<noteq> l!x" using step'(1) unfolding ufa_\<beta>_start_def by blast
+    show ?thesis apply (subst pl.displeasure_def[OF \<open>invar_rank l rkl\<close>, symmetric])
+      using pl.displeasure_parent_if_pleasant[OF \<open>invar_rank l rkl\<close> step'(1) True]
+      from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close>  pleasant_\<phi>[OF \<open>invar_rank l rkl\<close> True]]
+      IH' True dpleq 
+      apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l[x := rep_of l x]) rkl\<close>, symmetric])
+      apply (subst (asm) eq[symmetric])+
+      by linarith
+  next
+    case False
+    show ?thesis apply (subst pl.displeasure_def[OF \<open>invar_rank l rkl\<close>, symmetric])
+      using pl.displeasure_parent_if_unpleasant[OF \<open>invar_rank l rkl\<close> step'(1) False]
+        arbitrary_\<Phi>[OF \<open>invar_rank l rkl\<close> step'(1)] IH' False dpleq
+      apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l[x := rep_of l x]) rkl\<close>, symmetric])
+      apply (subst (asm) eq[symmetric])+
+      by linarith
+  qed
+qed
+
 
 lemma amortized_cost_fw_ipc_top_part:
   assumes "fw_ipc l x i l'" "top_part l rkl x"
