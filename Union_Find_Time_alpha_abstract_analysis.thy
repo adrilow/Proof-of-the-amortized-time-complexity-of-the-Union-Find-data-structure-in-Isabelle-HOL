@@ -1773,12 +1773,13 @@ begin
 
 context \<comment>\<open>NonRoot\<close>
   fixes v::nat
-  assumes v_has_a_parent: "v\<noteq>l!v"
+  assumes vinDom: "v<length l" and
+    v_has_a_parent: "v\<noteq>l!v"
 begin
 
 lemma non_root_has_constant_rankr:
   "rankr rkl v = rankr rkl' v"
-  using \<rho>_gt_0 non_root_has_constant_rank[OF contextasm v_has_a_parent] unfolding rankr_def by simp
+  using \<rho>_gt_0 non_root_has_constant_rank[OF contextasm vinDom v_has_a_parent] unfolding rankr_def by simp
 
 lemma rankr_parent_grows:
   "rankr rkl (l!v) \<le> rankr rkl' (l'!v)"
@@ -1814,11 +1815,11 @@ end \<comment>\<open>NonRoot\<close>
 
 
 lemma \<phi>_v_cannot_increase:
-  assumes "rankr rkl v = rankr rkl' v"
+  assumes "v<length l" "rankr rkl v = rankr rkl' v"
   shows "\<phi> l' rkl' v \<le> \<phi> l rkl v"
 proof (cases "v\<noteq>l!v")
   case True
-  show ?thesis using \<phi>_cannot_increase_nonroot[OF True] .
+  show ?thesis using \<phi>_cannot_increase_nonroot[OF assms(1) True] .
 next
   case False
   hence is_root: "l!v = v" by presburger
@@ -2223,7 +2224,8 @@ proof -
   { fix i::nat
     assume "i\<in>({0..<length l} - {x})"
     have "(\<phi> (l[x := rep_of l x]) rkl i) \<le> (\<phi> l rkl i)" 
-      using compress_evolution \<open>x < length l\<close> \<phi>_v_cannot_increase assms(1) contextasm by blast
+      using compress_evolution \<open>x < length l\<close> \<phi>_v_cannot_increase assms(1) contextasm
+      using \<open>i \<in> {0..<length l} - {x}\<close> by force
     } note conteq=this
   show ?thesis apply simp apply (subst sub1) apply (subst sub2)
     apply (rule rt)
@@ -2243,8 +2245,8 @@ lemma arbitrary_\<Phi>:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)"
   shows "\<Phi> (l[x:= rep_of l x]) rkl \<le> \<Phi> l rkl"
   apply simp using \<phi>_v_cannot_increase[OF contextasm]
-  by (metis (no_types, lifting) compress_evolution contextasm eq_iff list_update_beyond 
-      list_update_same_conv not_le_imp_less rep_of_refl sum_mono)
+  by (metis atLeastLessThan_iff compress_evolution contextasm eq_iff list_update_beyond 
+      list_update_id not_le_imp_less rep_of_refl sum_mono)
 
 
 \<comment>\<open>We now evaluate the amortized cost of path compression in the "top part" of the path. \<close>
