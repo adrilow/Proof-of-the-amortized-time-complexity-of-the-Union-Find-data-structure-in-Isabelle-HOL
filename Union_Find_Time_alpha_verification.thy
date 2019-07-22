@@ -109,7 +109,7 @@ lemma uf_init_bound[asym_bound]: "uf_init_time \<in> \<Theta>(\<lambda>n. n)"
   unfolding uf_init_time_def by auto2
 
 lemma uf_init_bound2[asym_bound]: "uf_init_time2 \<in> \<Theta>(\<lambda>n. n)" 
-  unfolding uf_init_time_def by auto2
+  unfolding uf_init_time2_def by auto2
 
 lemma Array_new_rule'[sep_heap_rules]: "<$ (n + 1) * true> Array.new n x <\<lambda>r. r \<mapsto>\<^sub>a replicate n x>\<^sub>t"
   by sep_auto
@@ -426,6 +426,15 @@ qed
     
 
 definition uf_rep_of_c_time2 where "uf_rep_of_c_time2 n = 4* (2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4)"
+
+\<comment>\<open>lemma "(\<lambda>n. \<alpha> (n+1)) \<in> \<Theta>(\<lambda>n. \<alpha> n)" 
+
+lemma "(\<lambda>x. 20  + 8 * real (\<alpha> (x + 1)))
+  \<in> \<Theta>(\<lambda>x. real (\<alpha> x))" unfolding \<rho>_def apply auto2
+
+lemma uf_rep_of_c_time2_asym: "uf_rep_of_c_time2 \<in> \<Theta>(\<lambda>n. \<alpha> n)"
+  unfolding uf_rep_of_c_time2_def using alphar_one[OF \<rho>_gt_0 ] \<rho>_def apply simp
+  apply auto2\<close>
 
 lemma uf_rep_of_c_rule2: "\<lbrakk>invar_rank l rkl; i<length l\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(\<Phi> l rkl * 4 + uf_rep_of_c_time2 (length l)) > uf_rep_of_c p i <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
@@ -1037,19 +1046,19 @@ qed
 
 
 
-interpretation UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
+interpretation UnionFind_Impl is_uf2 uf_init uf_init_time2 uf_cmp uf_cmp_time uf_union uf_union_time
 proof (unfold_locales, goal_cases)
 case (1 t x' x)
   show ?case
     unfolding PR_CONST_def mop_per_init_def apply simp
-    apply(rule extract_cost_otherway'[OF _ uf_init_rule, where Cost_lb="uf_init_time x"])
+    apply(rule extract_cost_otherway'[OF _ uf_init_rule', where Cost_lb="uf_init_time2 x"])
       apply (sep_auto simp: per_init'_def hn_ctxt_def pure_def)+
     using 1 by simp
 next
   case (2 t R' R a' a b' b)
    show ?case 
     unfolding PR_CONST_def mop_per_compare_def apply simp
-    apply(rule extract_cost_otherway'[OF _ uf_cmp_rule, where Cost_lb="(uf_cmp_time (card (Domain R')))"])
+    apply(rule extract_cost_otherway'[OF _ uf_cmp_rule_abstract, where Cost_lb="(uf_cmp_time (card (Domain R')))"])
       apply (sep_auto simp: per_init'_def hn_ctxt_def pure_def)+
     using 2 by simp
 next

@@ -1,12 +1,12 @@
 theory Union_Find_Time_alpha_abstract_analysis
 
 imports 
-  "../../SepLog_Automatic" 
-  "../../Refine_Imperative_HOL/Refine_Automation" 
+  "SeprefTime.SepLog_Automatic" 
+  "SeprefTime.Refine_Automation" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
-  \<comment>\<open>"SepLogicTime_RBTreeBasic.Asymptotics_1D"\<close>
- (* UnionFind_Impl *)
+  SepLogicTime_RBTreeBasic.Asymptotics_1D
+  UnionFind_Impl
   Ackermann
 begin
 
@@ -2348,7 +2348,8 @@ qed
 lemma amortized_cost_fw_ipc_top_part:
   assumes "fw_ipc l x i l'" "top_part l rkl x"
   shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
-  using amortized_cost_fw_ipc_top_part_inductive[OF assms] bounded_displeasure_alstrup[OF assms(2)] 
+  using amortized_cost_fw_ipc_top_part_inductive[OF assms] 
+        bounded_displeasure_alstrup[OF contextasm assms(2)] 
   by linarith
 
 \<comment>\<open>Say x is "easy" if @{term "alphar \<circ> (rankr rkl)"} is NOT constant all the way from x

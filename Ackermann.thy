@@ -1,4 +1,4 @@
-theory Ackermann imports Main "~~/src/HOL/ex/Primrec"  "~~/src/HOL/Library/Discrete" InverseNatNat begin
+theory Ackermann imports Main "HOL-ex.Primrec"  "HOL-Library.Discrete" InverseNatNat begin
 
 \<comment> \<open>This theory, including the structure of many proofs and the comments 
    follow closely the Coq library accompanying the paper by Charguéraud and Pottier:
