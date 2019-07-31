@@ -1715,6 +1715,13 @@ proof -
   with assms pxz EvCompress show ?thesis by fastforce
 qed
 
+
+lemma evolution_lengths:
+  assumes "evolution l rkl l' rkl'"
+  shows "length l = length l'" "length rkl = length rkl'"
+  using assms by (induction) (auto simp: union_by_rank_l_def union_by_rank_rkl_def)
+  
+
 context \<comment>\<open>StudyOfEvolution\<close>
   fixes l::"nat list" and rkl::"nat list" and l'::"nat list" and rkl'::"nat list"
   assumes contextasm: "invar_rank l rkl" "evolution l rkl l' rkl'"
@@ -1757,7 +1764,26 @@ qed
 lemma rank_parent_grows:
   assumes "v\<noteq>l!v"
   shows "rkl!(l!v) \<le> rkl'!(l'!v)"
-  sorry
+using assms apply (cases "l!v = l'!v") proof goal_cases
+  case 1 \<comment>\<open>True\<close>
+  then show ?case using rank_grows by presburger
+next
+  case 2 \<comment>\<open>False\<close>
+   show ?case using contextasm(2) 2 proof induction
+     case (EvUnion x y)
+     then show ?case unfolding union_by_rank_l_def 
+       by (smt contextasm(1) invar_rank_ufa_invarI nth_update_invalid ufa_union_preserves_parent)
+   next
+     case (EvCompress x y)
+     hence hz1: "l[x := rep_of l y]!v = rep_of l y" by (metis nth_list_update')
+     with EvCompress have hz2: "v = x"  by (metis nth_list_update')
+     with EvCompress have unique: "l!v = y" unfolding ufa_\<beta>_start_def by fast
+     show ?case apply (subst hz1) apply (subst unique) 
+       by (metis EvCompress.prems(2) contextasm(1) hz1 invar_rank_ufa_invarI less_imp_le_nat 
+           nth_update_invalid rank_increases_strictly_along_path 
+           rep_of_bound rep_of_ufa_\<beta> ufa_invarD(2) unique)
+   qed
+qed
 
 end  \<comment>\<open>StudyOfEvolution\<close>
 
@@ -1777,6 +1803,10 @@ context \<comment>\<open>NonRoot\<close>
     v_has_a_parent: "v\<noteq>l!v"
 begin
 
+lemma evoasms: "invar_rank l' rkl'"  "v<length l'" "l'!v\<noteq>v" 
+  using vinDom non_root_forever[OF contextasm v_has_a_parent] invar_rank_evolution[OF contextasm]
+    evolution_lengths[OF contextasm(2)] by auto
+
 lemma non_root_has_constant_rankr:
   "rankr rkl v = rankr rkl' v"
   using \<rho>_gt_0 non_root_has_constant_rank[OF contextasm vinDom v_has_a_parent] unfolding rankr_def by simp
@@ -1789,23 +1819,128 @@ lemma rankr_parent_grows:
 \<comment>\<open>Because @{term "rankr rkl v"} is constant while @{term "rankr rkl (l!v)"} may grow, 
   @{term "level l rkl v"} can only grow\<close>
 
+lemma defk_f_nat_nat: "f_nat_nat (\<lambda>k. Ackermann k (rankr rkl v))" 
+  using lnn_f_nat_nat[OF contextasm(1) vinDom v_has_a_parent[symmetric]]  
+  unfolding defk_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]]
+  . 
+
 lemma level_v_grows:
   "level l rkl v \<le> level l' rkl' v"
-  sorry
+  unfolding level_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]]  level_def[OF evoasms]
+    prek_def[OF contextasm(1)  vinDom v_has_a_parent[symmetric]] prek_def[OF evoasms]
+    defk_def[OF contextasm(1)  vinDom v_has_a_parent[symmetric]] defk_def[OF evoasms]
+  apply (subst Suc_le_mono)
+  apply (subst non_root_has_constant_rankr[symmetric])
+  using rankr_parent_grows f_nat_nat.\<beta>\<^sub>f_mono[OF defk_f_nat_nat] 
+    contextasm(1) level_exists v_has_a_parent vinDom by presburger
+
 
 \<comment>\<open>As long as  @{term "level l rkl v"} remains constant, @{term "index l rkl v"} can only grow.\<close>
+    
 
 lemma index_v_grows_if_level_v_constant:
   assumes "level l rkl v = level l' rkl' v"
   shows "index l rkl v \<le> index l' rkl' v"
-  sorry
+proof -
+  have h': "prek l rkl v = prek l' rkl' v" using assms 
+    unfolding level_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]] level_def[OF evoasms] 
+    by blast
+  show ?thesis 
+    unfolding index_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]] index_def[OF evoasms]
+    apply (subst h'[symmetric])
+    apply (subst non_root_has_constant_rankr[symmetric])
+    using rankr_parent_grows contextasm(1) index_exists v_has_a_parent vinDom
+      f_nat_nat.\<beta>\<^sub>f_mono[OF inn_f_nat_nat[OF contextasm(1) vinDom v_has_a_parent[symmetric]]]
+    by presburger
+qed
+
 
 \<comment>\<open>The potential @{term "\<phi> l rkl v"} cannot increase. (Lemma 4.5 on pages 18-19)\<close>
 
+
+lemma lexpo_well_defined:
+  assumes "(k::nat) < a" "i\<le>r"
+  shows "i \<le> (a-k)*r" 
+proof -
+  have sg1: "a-k = (1+ (a-k-1))" using assms by auto
+  show ?thesis apply (subst sg1) apply (subst ring_distribs) using assms by fastforce
+qed
+
+lemma lexpo_cannot_increase_if_ak_decreases:
+  assumes "(i::nat) \<le> r" "ak' < ak"
+  shows "ak' * r - i' \<le> ak * r - i"
+proof -
+  have h: "ak' \<le> ak - 1" using assms by force
+  hence "ak' * r  \<le> (ak - 1) * r " by fastforce
+  hence  h2: "ak' * r  - i'\<le> (ak - 1) * r -i'" by linarith
+  have "(ak - 1) * r - i' \<le> ak*r - i" apply (subst diff_mult_distrib) using assms by force
+  thus ?thesis using h2 by force
+qed
+
+lemma lexpo_cannot_increase:
+  assumes "(i::nat)\<le>r" "k\<le>k'" "k'<a" "k=k' \<longrightarrow> i\<le>i'"
+  shows "(a-k)*r - i \<ge> (a-k')*r-i'"
+  using assms proof (cases "k=k'")
+  case True
+  have "(a - k') * r - i' \<le> (a - k) * r - i'" using True by blast
+  then show ?thesis using assms(4) True by force
+next
+  case False
+  have "k<k'" using assms False by linarith
+  note assms' = assms(1,3) \<open>k<k'\<close> 
+  then show ?thesis proof (cases "i\<le>i'")
+    case True
+    have "(a - k') * r - i' \<le> (a - k') * r - i" using True by auto
+    moreover have "(a - k') * r \<le> (a - k) * r " using assms' by fastforce
+    ultimately show ?thesis by linarith
+  next
+    case False
+    hence False': "i>i'" by fastforce
+    have sg1: "a - k' < a - k" using assms' by fastforce
+    show ?thesis using lexpo_cannot_increase_if_ak_decreases[OF \<open>i\<le>r\<close> sg1] .
+  qed
+qed
+
+
 lemma \<phi>_cannot_increase_nonroot:
   "\<phi> l' rkl' v \<le> \<phi> l rkl v"
-  sorry
-
+proof -
+  have hK: "rankr rkl v = rankr rkl' v" 
+    using non_root_has_constant_rank[OF contextasm vinDom v_has_a_parent]unfolding rankr_def by simp
+  have hR: "v\<noteq>l'!v" using non_root_forever[OF contextasm v_has_a_parent] .
+  show ?thesis proof (cases "\<alpha>\<^sub>r (rankr rkl v) = \<alpha>\<^sub>r (rankr rkl (l!v))")
+    case True
+    note h\<phi> =  \<phi>_case_2[OF v_has_a_parent[symmetric] True]
+    show ?thesis apply (subst h\<phi>) 
+      apply (cases "\<alpha>\<^sub>r (rankr rkl' v) = \<alpha>\<^sub>r (rankr rkl' (l'!v))") proof goal_cases
+      case 1 \<comment>\<open>True\<close>
+      note h\<phi>' = \<phi>_case_2[OF evoasms(3) 1]
+      show ?case 
+        apply (subst h\<phi>') 
+        apply (subst Suc_eq_plus1[symmetric])+ 
+        apply (subst Suc_le_mono)
+        apply (subst hK[symmetric])+
+        apply (rule lexpo_cannot_increase)
+           apply (rule index_le_rank[OF contextasm(1) vinDom v_has_a_parent[symmetric]])
+          apply (rule level_v_grows)
+         apply (subst hK) apply (subst 1) apply (rule level_lt_\<alpha>\<^sub>r[OF evoasms])
+        using index_v_grows_if_level_v_constant by blast
+    next
+      case 2 \<comment>\<open>False\<close>
+      show ?case using \<phi>_case_3[OF evoasms(3) 2] by fastforce
+    qed
+  next
+    case False
+    note h\<phi> = \<phi>_case_3[OF v_has_a_parent[symmetric] False]
+    note H = \<alpha>\<^sub>r_rankr_grows_along_edges_corollary[OF contextasm(1) vinDom 
+             v_has_a_parent[symmetric] False]
+    have h0: "\<alpha>\<^sub>r (rankr rkl' v) < \<alpha>\<^sub>r (rankr rkl' (l'!v))"
+      apply (subst hK[symmetric]) 
+      apply (rule order.strict_trans2) 
+      apply (rule H) using rankr_parent_grows mono_alphar[OF \<rho>_gt_0] unfolding mono_def by blast
+    show ?thesis apply (subst h\<phi>) using h0 \<phi>_case_3[OF evoasms(3), of rkl'] by fastforce
+  qed
+qed
 
 end \<comment>\<open>NonRoot\<close>
 
@@ -1910,10 +2045,63 @@ next
   then show ?case unfolding ufa_\<beta>_start_def by blast
 qed
 
-lemma ipc_defined:
-  assumes "ufa_invar l"
+lemma ipc_defined_preliminary:
+  assumes "ufa_invar l" "(x,r)\<in>(ufa_\<beta>_start l)\<^sup>*" "r=l!r"
   shows "\<exists> i l'. bw_ipc l x i l'"
-  sorry
+  using assms(2,1,3) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case using BWIPCBase by blast
+next
+  case (step y z)
+  obtain i a where sg: "bw_ipc l z i a" using step by blast
+  show ?case using BWIPCStep[OF step(1) sg] by blast
+qed
+
+
+lemma ipc_defined:
+  assumes "ufa_invar l" "x<length l"
+  shows "\<exists> i l'. bw_ipc l x i l'"
+proof -
+  have sg1: "(x,rep_of l x)\<in> (ufa_\<beta>_start l)\<^sup>*" unfolding ufa_\<beta>_def using assms rep_of_ufa_\<beta>_refl by blast
+  have "rep_of l x = l!rep_of l x" by (simp add: assms rep_of_min)
+  thus ?thesis  using sg1 ipc_defined_preliminary[OF assms(1)] by blast
+qed
+
+lemma compress_preserves_roots_other_than_x:
+  assumes "r\<noteq>x" "r=l!r"
+  shows "r=l[x:=rep_of l x]!r"
+  using assms by simp
+thm fw_ipc.induct
+
+
+lemma fw_ipc_compress_preliminary:
+  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
+  shows "fw_ipc (l[x:= rep_of l x]) y i (l'[x:=rep_of l x])"
+  using assms proof (induction l y i l' rule: fw_ipc.induct)
+  case base: (FWIPCBase x' l)
+  have "x'\<noteq>x" using base(2) by fast
+  show ?case using FWIPCBase[OF compress_preserves_roots_other_than_x[OF \<open>x'\<noteq>x\<close> base(1)]] .
+next
+  case step: (FWIPCStep x' y l i l')
+  have sg0': "rep_of l y =  rep_of l x'" using step(1) rep_of_path_iff[OF \<open>ufa_invar l\<close>]
+    using rep_of_idx step.prems(2) ufa_\<beta>_start_def by auto
+  have sg0: "(y, x) \<notin> (ufa_\<beta>_start (l[x' := rep_of l y]))\<^sup>*"  apply (subst sg0') using step(4,1) 
+    sorry
+  hence sg0c: "(x', x) \<notin> (ufa_\<beta>_start (l[x' := rep_of l y]))\<^sup>*" using step(1,4) sorry
+  have sg1: "(x', y) \<in> ufa_\<beta>_start (l[x := rep_of l x])" using step 
+    by (metis (no_types, lifting) length_list_update mem_Collect_eq nth_list_update_neq 
+        prod.simps(2) rtrancl.simps ufa_\<beta>_start_def)
+  have sg2: "ufa_invar (l[x' := rep_of l y])" apply (subst sg0') 
+    using ufa_compress_invar[OF \<open>ufa_invar l\<close>] step(1) unfolding ufa_\<beta>_start_def by blast
+  have sg3': "rep_of (l[x' := rep_of l y]) x = rep_of l x" apply (subst sg0') 
+    using step(4) sg0c apply (subst (asm) sg0') sorry
+  have sg3'': "rep_of (l[x := rep_of l x]) y = rep_of l y" using step sorry
+  have sg3: "fw_ipc (l[x := rep_of l x, x' := rep_of (l[x := rep_of l x]) y]) y i (l'[x := rep_of l x])"
+    using step(3)[OF sg0 sg2] apply (subst (asm) sg3') apply (subst (asm) sg3') apply (subst sg3'') 
+    by (metis list_update_swap sg0')
+  show ?case using FWIPCStep[OF sg1 sg3] .
+qed
+
 
 lemma bw_ipc_fw_ipc:
   assumes "ufa_invar l" "bw_ipc l x i l'" 
@@ -2487,7 +2675,7 @@ lemma amortized_cost_of_iterated_path_compression_local:
   shows "\<exists> i l'. bw_ipc l x i l' \<and> \<Phi> l' rkl + i < \<Phi> l rkl + 2 * \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
 proof -
   obtain i l' where h1: "bw_ipc l x i l'" using \<open>invar_rank l rkl\<close> unfolding invar_rank_def 
-    using ipc_defined by presburger
+    using ipc_defined[OF _ assms] by presburger
   thus ?thesis using assms \<open>invar_rank l rkl\<close> amortized_cost_fw_ipc bw_ipc_fw_ipc 
     unfolding invar_rank_def by fast
 qed

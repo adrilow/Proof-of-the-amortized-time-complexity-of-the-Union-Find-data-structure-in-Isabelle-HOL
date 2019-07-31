@@ -145,9 +145,8 @@ lemma \<beta>\<^sub>f_f_exact: "x = \<beta>\<^sub>f (f x)"
   by (meson \<beta>\<^sub>f_f f_\<beta>\<^sub>f le0 order_class.order.antisym strict_mono_f strict_mono_less_eq)
 
 (*mono f \<longleftrightarrow> (\<forall>x y. x \<le> y \<longrightarrow> f x \<le> f y)*)
-lemma \<beta>\<^sub>f_mono: "\<forall>x y. (f 0 \<le> x \<and> x \<le> y) \<longrightarrow> f x \<le> f y"
-  using \<beta>\<^sub>f_spec_reciprocal f_\<beta>\<^sub>f
-  by (simp add: strict_mono_f strict_mono_less_eq)
+lemma \<beta>\<^sub>f_mono: "\<forall>x y. (f 0 \<le> x \<and> x \<le> y) \<longrightarrow> \<beta>\<^sub>f x \<le> \<beta>\<^sub>f y"
+  using \<beta>\<^sub>f_spec_reciprocal f_\<beta>\<^sub>f by force
 
 (* -------------------------------------------------------------------------- *)
 section{* Relationship between \<alpha>_f and \<beta>_f *}
