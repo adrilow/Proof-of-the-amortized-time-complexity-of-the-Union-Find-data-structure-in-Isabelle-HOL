@@ -1659,8 +1659,38 @@ qed
 lemma invar_rank_link:
   assumes "invar_rank l rkl" "x < length l" "y < length l" "x=l!x" "y=l!y" "x\<noteq>y"
   shows "invar_rank (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
-  sorry
+  unfolding invar_rank_def
+  using assms proof (safe,goal_cases)
+  case 1
+  then show ?case using ufa_union_invar[OF invar_rank_ufa_invarI[OF 1(1)]]
+    unfolding union_by_rank_l_def by presburger
+next
+  case 2
+  then show ?case unfolding union_by_rank_l_def union_by_rank_rkl_def invar_rank_def by fastforce
+next
+  case (3 i j)
+  then show ?case unfolding union_by_rank_l_def union_by_rank_rkl_def invar_rank_def 
+    by (smt Suc_lessD Suc_less_eq Suc_n_not_le_n le_eq_less_or_eq length_list_update 
+        not_le_imp_less nth_list_update_eq nth_list_update_neq order_less_irrefl rep_of_iff)
+next
+  case 4
+  then show ?case unfolding union_by_rank_l_def union_by_rank_rkl_def invar_rank_def 
+  proof (auto cong: if_cong, goal_cases)
+    case 1
+    then show ?case sorry
+  next
+    case 2
+    then show ?case sorry
+  next
+    case 3
+    then show ?case sorry
+  qed
+next
+  case (5 i)
+  then show ?case sorry
+qed
 
+\<comment>\<open>The proof is awful, please don't look at it\<close>
 lemma invar_rank_compress:
   assumes "invar_rank l rkl"  "(x,y)\<in>(ufa_\<beta>_start l)"
   shows "invar_rank (l[x:= rep_of l y]) rkl"
@@ -1683,7 +1713,47 @@ next
     by (smt case_prodD mem_Collect_eq nth_list_update_eq nth_list_update_neq rep_of_path_iff sum_ivl_cong)
 next
   case (5 i)
-  then show ?case unfolding invar_rank_def apply auto sorry
+  have xidom: "i<length l" "x<length l" "y<length l" using 5 unfolding ufa_\<beta>_start_def by auto
+  have deq: "descendants l i = descendants (l[x := rep_of l y]) i" using 5 unfolding descendants_def
+  proof(safe, goal_cases)
+    case (1 x')
+    show ?case using 1(5,1-4) 
+    proof (cases "x'=x")
+      case True
+      then show ?thesis using compress_preserves_paths_to_roots[OF \<open>(x, y) \<in> ufa_\<beta>_start l\<close> 
+           invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] _ \<open>(x', i) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> ]
+        by (smt "5"(4) assms(1,2) case_prodD invar_rank_ufa_invarI mem_Collect_eq nth_list_update' 
+            rep_of_idx rep_of_ufa_\<beta>_refl rtrancl.rtrancl_refl ufa_\<beta>_start_def)
+    next
+      case False
+      then show ?thesis using compress_preserves_paths_to_roots[OF \<open>(x, y) \<in> ufa_\<beta>_start l\<close> 
+           invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] _ \<open>(x', i) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> ]
+        by (smt "5"(4) assms(1) assms(2) case_prodD invar_rank_ufa_invarI mem_Collect_eq 
+            nth_list_update' nth_list_update_eq rep_of_idx rep_of_min rep_of_ufa_\<beta>_refl 
+            ufa_\<beta>_start_def xidom(1,2))
+    qed 
+  next
+    case (2 x')
+    show ?case using 2(5,1-4) 
+    proof (cases "x'=x")
+      case True
+      with 2 show ?thesis by (metis compress_preserves_rep_of_direct invar_rank_ufa_invarI 
+            length_list_update r_into_rtrancl rep_of_bound rep_of_invar_along_path rep_of_path_iff 
+            ufa_compress_invar xidom(2) xidom(3))
+    next
+      case False
+      have sg: "(x, y) \<in> (ufa_\<beta>_start l)\<^sup>*" using 2 by fast
+      with 2(5) 2(1-3) False show ?thesis using 
+          compress_preserves_rep_of_direct[OF 2(2) invar_rank_ufa_invarI[OF 2(1)] _]
+        apply (induction rule: converse_rtrancl_induct) by blast
+          (smt "5"(4) Pair_inject case_prodD converse_rtrancl_into_rtrancl invar_rank_ufa_invarI 
+            length_list_update mem_Collect_eq rep_of_bound rep_of_idx rep_of_invar_along_path  
+            rep_of_refl rep_of_ufa_\<beta>_refl ufa_\<beta>_start_def ufa_compress_aux(2) ufa_compress_invar xidom(1,2))
+    qed 
+  qed
+  have "i<length l" using 5 by fastforce
+  thus ?case apply (subst deq[symmetric]) using 5 deq unfolding invar_rank_def
+    by (metis nth_list_update rep_of_min xidom(2) xidom(3))
 qed
 
 
@@ -2437,10 +2507,25 @@ qed
    
 
 lemma pleasant_\<phi>:
-  assumes "pl.pleasant l rkl x"
+  assumes "x<length l" "pl.pleasant l rkl x"
   shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
-  sorry
+proof -
+  have h6: "(l!x, rep_of l x)\<in> (ufa_\<beta>_start l)\<^sup>*"  using assms 
+    using contextasm invar_rank_ufa_invarI rep_of_bound rep_of_idx rep_of_path_iff ufa_invarD(2) 
+    unfolding pl.pleasant_def[OF contextasm] by auto
+  have h7: "\<alpha>\<^sub>r (rankr rkl x) \<le> \<alpha>\<^sub>r (rankr rkl (l!x))"
+    using \<alpha>\<^sub>r_rankr_grows_along_edges[OF contextasm assms(1)] using assms(2) 
+    unfolding pl.pleasant_def[OF contextasm] by argo
+  have h7': "(x,rep_of l x)\<in> ufa_\<beta> l"  using assms
+    unfolding pl.pleasant_def[OF contextasm] 
+    using invar_rank_ufa_invarI[OF contextasm] rep_of_min rep_of_ufa_\<beta> by fastforce 
+  have h7: "\<alpha>\<^sub>r (rankr rkl x) \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+    using \<alpha>\<^sub>r_rankr_grows_along_a_path[OF contextasm assms(1) 
+        rep_of_bound[OF invar_rank_ufa_invarI[OF contextasm] \<open>x<length l\<close>] _ h7'] using assms(2)
+    unfolding pl.pleasant_def[OF contextasm] by fastforce
 
+    show ?thesis    sorry
+qed
 
 lemma arbitrary_\<Phi>:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)"
@@ -2545,13 +2630,40 @@ lemma amortized_cost_fw_ipc_top_part:
    a path compression step at x causes the potential of x to decrease. This
    is Lemma 4.9 in Alstrup et al.'s paper.\<close>
 
+lemma compress_changes_parent_of_x_to_z:
+  assumes "x<length l"  
+  shows "(l[x:= rep_of l x])!x = rep_of l x"
+  using assms by auto
+
+lemma compress_preserves_roots_converse:
+  assumes "r = (l[x:= rep_of l x])!r"
+  shows "r = l!r"
+  using assms
+  by (metis contextasm invar_rank_ufa_invarI  nth_list_update_neq nth_update_invalid
+      rep_of_min rep_of_refl ufa_compress_aux(2))
 
 
 lemma easy_\<phi>:
-  assumes "x\<noteq>l!x" "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))" 
+  assumes "x<length l" "x\<noteq>l!x" "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))" 
   "\<alpha>\<^sub>r (rankr rkl (l!x)) < \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
 shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
-  sorry
+proof -
+  have h4: "(l!x,rep_of l x)\<in>(ufa_\<beta>_start l)\<^sup>*" 
+    using   rep_of_bound[OF invar_rank_ufa_invarI[OF contextasm] assms(1)] 
+      rep_of_idx[OF invar_rank_ufa_invarI[OF contextasm] assms(1)] 
+      rep_of_path_iff[OF invar_rank_ufa_invarI[OF contextasm] ]
+      ufa_invarD(2)[OF invar_rank_ufa_invarI[OF contextasm] assms(1)] 
+    by blast
+  note h = \<phi>_case_2_lower_bound[OF contextasm \<open>x<length l\<close> assms(2)[symmetric] assms(3)]
+  have h5: "\<alpha>\<^sub>r (rankr rkl x) \<noteq> \<alpha>\<^sub>r (rankr rkl ((l[x := rep_of l x])!x))" 
+    apply (subst compress_changes_parent_of_x_to_z[OF assms(1)])
+    using assms(3,4) by linarith
+  show ?thesis using  h5 apply (subst(asm) compress_changes_parent_of_x_to_z[OF assms(1)])
+    using \<phi>_case_3 h
+      compress_changes_parent_of_x_to_z[OF assms(1), symmetric]
+      compress_preserves_roots_converse[of "rep_of l x" x]
+    by (metis One_nat_def \<phi>_case_3 h less_eq_Suc_le)
+qed
 
 end \<comment>\<open>invar_rank\<close>
   \<comment>\<open>Change of context in order to use the above lemmas for arbitrary l\<close>
