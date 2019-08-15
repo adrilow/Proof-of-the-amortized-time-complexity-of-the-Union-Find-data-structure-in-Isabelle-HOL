@@ -1,0 +1,7 @@
+\chapter{\abstractname}
+
+%TODO: Abstract
+In this thesis we prove the $\alpha$-bound amortized time complexity of an efficient imperative implementation of a Union-Find data structure. We first go through the history of this emblematic result by Tarjan (ref) and arrive at the modern proof by Alstrup et al (ref). 
+To reproduce this proof in a formal context within Isabelle/HOL, we first gather the mathematical and technical tools required, most prominently an alternative Theory about the Ackermann function and its inverses, as well as the Separation Logic Framework, which already contained a non optimal implementation of this data structure.
+We then follow closely the work of Chargéraud and Pottier, which formalized this proof in a similar framework in Coq to arrive to the desired Hoare-Triples. The whole proof in Isabelle is available under (ref). As with any other program in Imperative/HOL, it can be exported to several languages.
+

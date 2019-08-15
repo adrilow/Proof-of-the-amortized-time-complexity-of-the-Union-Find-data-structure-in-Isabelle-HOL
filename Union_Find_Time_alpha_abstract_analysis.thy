@@ -854,6 +854,12 @@ lemma ancestors_in_domain:
   qed simp
 qed
 
+lemma ancestors_of_parent_inclusion:
+  assumes "(x,y)\<in>(ufa_\<beta>_start l)"
+  shows "ancestors l y \<subseteq> ancestors l x"
+  unfolding ancestors_def using assms
+  by auto
+
 
 
 definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
@@ -903,12 +909,16 @@ lemma rank_bounds_height:
 
 
 lemma rank_increases_along_path_refl:
-  assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
   shows "rkl!i \<le> rkl!j"
-proof -
-  obtain "k" where kstuff: "kpath (ufa_\<beta>_start l) i j k" 
-    using assms(5) rtclosure_kpath[of i j "ufa_\<beta>_start l" ] by blast
-  then show ?thesis using rank_bounds_height_precise[OF assms(1-4) kstuff] by simp
+proof (cases "i=j")
+  case True
+  then show ?thesis by simp
+next
+  case False
+   obtain "k" where kstuff: "kpath (ufa_\<beta>_start l) i j k" 
+    using assms(4) rtclosure_kpath[of i j "ufa_\<beta>_start l" ] by blast
+  then show ?thesis using rank_bounds_height_precise[OF assms(1-3) False kstuff] by simp
 qed
 
 \<comment>\<open>Rank increases strictly along a nontrivial path.\<close>
@@ -935,7 +945,7 @@ lemma rankr_positive: "0 < rankr rkl x"
   unfolding rankr_def using \<rho>_geq_1 by fastforce
 
 lemma rankr_increases_along_path_refl:
- assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+ assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
  shows "rankr rkl i \<le> rankr rkl j"
   unfolding rankr_def using rank_increases_along_path_refl[OF assms] by auto
 
@@ -948,9 +958,14 @@ lemma rankr_increases_strictly_along_path:
 lemma \<alpha>\<^sub>r_rankr_grows_along_a_path:
   assumes "invar_rank l rkl" "i < length l" "j < length l" "i\<noteq>j" "(i,j) \<in> ufa_\<beta> l"
   shows "\<alpha>\<^sub>r (rankr rkl i) \<le> \<alpha>\<^sub>r (rankr rkl j)"
-  using mono_alphar[of \<rho>] using \<rho>_geq_1 rankr_increases_strictly_along_path[OF assms] 
+  using mono_alphar[OF \<rho>_gt_0] rankr_increases_strictly_along_path[OF assms] 
   unfolding mono_def by fastforce
 
+lemma \<alpha>\<^sub>r_rankr_grows_along_a_path_refl:
+  assumes "invar_rank l rkl" "i < length l" "j < length l" "(i,j) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "\<alpha>\<^sub>r (rankr rkl i) \<le> \<alpha>\<^sub>r (rankr rkl j)"
+  using mono_alphar[OF \<rho>_gt_0] rankr_increases_along_path_refl[OF assms]
+  unfolding mono_def by fastforce
 
 lemma rep_of_invar_along_path':
   assumes "ufa_invar l" "i < length l" "i' < length l"  "j < length l" 
@@ -1524,7 +1539,14 @@ begin \<comment>\<open>invar\<close>
 lemma compress_preserves_paths_out_of_y:
   assumes "(v,w)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y,v)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= rep_of l x]))\<^sup>*"
-  sorry
+  using assms(1) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step y z)
+  have "(y, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])" sorry
+  then show ?case using step by fastforce
+qed
 
 lemma compress_preserves_paths_out_of_z:
   assumes "(v,w)\<in>(ufa_\<beta>_start l)\<^sup>*" "(rep_of l x,v)\<in>(ufa_\<beta>_start l)\<^sup>*"
@@ -1564,67 +1586,6 @@ lemma compress_preserves_rep_of_direct:
 end \<comment>\<open>invar\<close>
 end \<comment>\<open>x_edge_y\<close>
 
-
-section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
-
-\<comment>\<open>During a compression, the level function is unchanged at ancestors of y\<close>
-
-\<comment>\<open>This would be compress_preserves_k_above_y, again this does not apply as we compress differently\<close>
-
-
-\<comment>\<open> Assume x and y are non-roots. (This is required for their level and index
-   to be defined.) Assume that there is a non-trivial path from x to y.
-   Finally, assume that x and y have the same level, i.e., @{term "level l rkl x = level l rkl y"}.
-   Then, @{term "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"}. 
-   This is part of the proof of Lemma 4.10 in Alstrup et al.'s paper. \<close>
-
-lemma levelx_levely:
-  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
-  shows "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"
-proof -
-  have pp: "prek l rkl x = prek l rkl y" using level_def assms by simp
-  \<comment>\<open> Because there is a path from the parent of x to y, the rank of y
-     is at least the rank of the parent of x. \<close>
-  have "l!x<length l" using assms(1,2) unfolding invar_rank_def ufa_invar_def by blast
-  hence hxy: "rankr rkl (l!x) \<le> rankr rkl y"
-    using  assms rankr_increases_along_path_refl by blast
-  \<comment>\<open> By definition of @{term "index l rkl"}, iterating @{term "index l rkl x"} times 
-    @{term "Ackermann (prek l rkl x)"}, starting from @{term "rankr rkl x"}, takes us at most to c
-     @{term "rankr rkl (l!x)"}. \<close>
-  have hx: "compow (index l rkl x) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!x)"
-    unfolding index_def[OF assms(1,2) assms(4)[symmetric]] 
-    apply (rule f_nat_nat.f_\<beta>\<^sub>f[OF inn_f_nat_nat, OF assms(1) assms(2) assms(4)[symmetric], of "rankr rkl (l ! x)"])
-    apply simp
-    using assms(1,2) parent_has_greater_rankr by fastforce
-  (* By definition of [prek], applying [A (prek x)] to [rankr y] takes us
-     at least to [rankr (p y)]. *)
-  have hy': "Ackermann 0 (rankr rkl y) \<le> rankr rkl (l ! y)" apply (subst Ackermann_base_eq) unfolding rankr_def 
-    using assms(1,3,5) parent_has_greater_rank by fastforce
-  have hy: "Ackermann (prek l rkl x) (rankr rkl y) \<le> rankr rkl (l!y)"
-    apply (subst pp)
-    using f_nat_nat.\<beta>\<^sub>f_spec_direct[OF lnn_f_nat_nat, OF assms(1) assms(3) assms(5)[symmetric], of "rankr rkl (l ! y)" "(prek l rkl y)"] unfolding defk_def[OF assms(1) assms(3) assms(5)[symmetric]] sorry
-  show ?thesis apply simp using hx hxy hy sorry
-qed
-
-
-\<comment>\<open>Under the same assumptions as the previous lemma, if one preforms path compression on x then
-  either @{term "rankr rkl x"} changes (which means it increases, really, but we have not proved 
-  that), or @{term "index l rkl x"} increases\<close>
-
-lemma levelx_levely_compress:
-  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
-          "z = rep_of l x" "level l rkl x = level (l[x:= rep_of l x]) rkl x"
-  shows "Suc (index l rkl x) \<le> index (l[x:= rep_of l x]) rkl x"
-proof -
-  have pyz: "z = rep_of l (l!y)" using assms
-    by (metis (no_types, hide_lams) invar_rank_def rep_of_bound rep_of_idx rep_of_invar_along_path ufa_invarD(2))
-  have rpyz: "rankr rkl (l!y) \<le> rankr rkl z"
-    by (metis (no_types, lifting) assms(1) assms(3) eq_iff invar_rank_def pyz rankr_increases_along_path_refl rep_of_bound rep_of_ufa_\<beta>_refl ufa_invarD(2))
-  note f = levelx_levely[OF assms(1-7)]
-  have rpyz': "(Ackermann (prek l rkl x) ^^ Suc (index l rkl x)) (rankr rkl x) \<le> rankr rkl z" using rpyz f by linarith
-  have prehkk: "prek l rkl x = prek (l[x:= rep_of l x]) rkl x" using assms(9) using level_def assms sorry
-  show ?thesis sorry
-qed
 
 
 
@@ -1857,9 +1818,179 @@ qed
 
 end  \<comment>\<open>StudyOfEvolution\<close>
 
+section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
+
+\<comment>\<open>During a compression, the level function is unchanged at ancestors of y\<close>
+
+\<comment>\<open>This would be compress_preserves_k_above_y, again this does not apply as we compress differently\<close>
+
+
+\<comment>\<open> Assume x and y are non-roots. (This is required for their level and index
+   to be defined.) Assume that there is a non-trivial path from x to y.
+   Finally, assume that x and y have the same level, i.e., @{term "level l rkl x = level l rkl y"}.
+   Then, @{term "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"}. 
+   This is part of the proof of Lemma 4.10 in Alstrup et al.'s paper. \<close>
+
+lemma levelx_levely:
+  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
+  shows "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"
+proof -
+  have pp: "prek l rkl x = prek l rkl y" using level_def assms by simp
+      \<comment>\<open> Because there is a path from the parent of x to y, the rank of y
+     is at least the rank of the parent of x. \<close>
+  have "l!x<length l" using assms(1,2) unfolding invar_rank_def ufa_invar_def by blast
+  hence hxy: "rankr rkl (l!x) \<le> rankr rkl y"
+    using  assms rankr_increases_along_path_refl by blast
+      \<comment>\<open> By definition of @{term "index l rkl"}, iterating @{term "index l rkl x"} times 
+    @{term "Ackermann (prek l rkl x)"}, starting from @{term "rankr rkl x"}, takes us at most to c
+     @{term "rankr rkl (l!x)"}. \<close>
+  have hx: "compow (index l rkl x) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!x)"
+    unfolding index_def[OF assms(1,2) assms(4)[symmetric]] 
+    apply (rule f_nat_nat.f_\<beta>\<^sub>f[OF inn_f_nat_nat, OF assms(1) assms(2) assms(4)[symmetric], of "rankr rkl (l ! x)"])
+    apply simp
+    using assms(1,2) parent_has_greater_rankr by fastforce
+      (* By definition of [prek], applying [A (prek x)] to [rankr y] takes us
+     at least to [rankr (p y)]. *)
+  have hy': "Ackermann 0 (rankr rkl y) \<le> rankr rkl (l ! y)" apply (subst Ackermann_base_eq) unfolding rankr_def 
+    using assms(1,3,5) parent_has_greater_rank by fastforce
+  have hy: "Ackermann (prek l rkl x) (rankr rkl y) \<le> rankr rkl (l!y)"
+    apply (subst pp)
+    using f_nat_nat.\<beta>\<^sub>f_spec_direct[OF lnn_f_nat_nat, OF assms(1) assms(3) assms(5)[symmetric],
+        of "rankr rkl (l ! y)" "(prek l rkl y)"] 
+    unfolding prek_def[OF assms(1) assms(3) assms(5)[symmetric]] 
+      defk_def[OF assms(1) assms(3) assms(5)[symmetric]] using hy' by fast
+  have sg1: "Ackermann (prek l rkl x) (rankr rkl y)  \<le> rankr rkl (l ! y)" using hy by simp
+  have sg0: "Ackermann (prek l rkl x) (rankr rkl (l ! x))  \<le> rankr rkl (l ! y)" using hxy sg1
+      mono_Ackermann[of "prek l rkl x"] unfolding mono_def by fastforce
+  show ?thesis apply simp using sg0 hx mono_Ackermann[of "prek l rkl x"] unfolding mono_def 
+    by fastforce
+qed
+
+
+\<comment>\<open>Under the same assumptions as the previous lemma, if one preforms path compression on x then
+  either @{term "rankr rkl x"} changes (which means it increases, really, but we have not proved 
+  that), or @{term "index l rkl x"} increases\<close>
+
+lemma levelx_levely_compress:
+  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
+    "z = rep_of l x" "level l rkl x = level (l[x:= rep_of l x]) rkl x"
+  shows "Suc (index l rkl x) \<le> index (l[x:= rep_of l x]) rkl x"
+proof -
+  have pyz: "z = rep_of l (l!y)" using assms
+    by (metis (no_types, hide_lams) invar_rank_def rep_of_bound rep_of_idx 
+        rep_of_invar_along_path ufa_invarD(2))
+  have rpyz: "rankr rkl (l!y) \<le> rankr rkl z"
+    by (metis (no_types, lifting) assms(1) assms(3) invar_rank_def pyz 
+        rankr_increases_along_path_refl rep_of_bound rep_of_ufa_\<beta>_refl ufa_invarD(2))
+  note f = levelx_levely[OF assms(1-7)]
+  have rpyz': "(Ackermann (prek l rkl x) ^^ Suc (index l rkl x)) (rankr rkl x) \<le> rankr rkl z" 
+    using rpyz f by linarith
+  have sg0: "x < length (l[x := rep_of l x])" using assms(2) by simp
+  have prehkk: "prek l rkl x = prek (l[x:= rep_of l x]) rkl x" 
+    using assms(9) level_def[OF assms(1,2) assms(4)[symmetric]] 
+      level_def[OF invar_rank_evolution[OF assms(1) compress_evolution[OF assms(1,2,4)]] 
+        sg0 non_root_forever[OF assms(1) compress_evolution[OF assms(1,2,4)] assms(4), symmetric]]
+    by auto
+  have f': "(Ackermann (prek (l[x := rep_of l x]) rkl x) ^^ Suc (index l rkl x)) (rankr rkl x)
+    \<le> rankr rkl z" using rpyz' apply (subst (asm) prehkk) .
+  have sg1: "l[x := rep_of l x] ! x = rep_of l x" by (simp add: assms(2))
+  show ?thesis unfolding index_def[OF invar_rank_evolution[OF assms(1) compress_evolution[OF assms(1,2,4)]] 
+        sg0 non_root_forever[OF assms(1) compress_evolution[OF assms(1,2,4)] assms(4), symmetric]]
+    apply (rule f_nat_nat.\<beta>\<^sub>f_spec_reciprocal)
+    subgoal 
+      using inn_f_nat_nat[OF invar_rank_evolution[OF assms(1) compress_evolution[OF assms(1,2,4)]] sg0
+          non_root_forever[OF assms(1) compress_evolution[OF assms(1,2,4)] assms(4), symmetric]] .
+    subgoal using f' apply (subst (asm) \<open>z=rep_of l x\<close>) apply (subst sg1) .
+    done
+qed
 
 
 section{*Evolution of level, index and potential over time (UnionFind43PotentialAnalysis)*}
+
+lemma lexpo_well_defined:
+  assumes "(k::nat) < a" "i\<le>r"
+  shows "i \<le> (a-k)*r" 
+proof -
+  have sg1: "a-k = (1+ (a-k-1))" using assms by auto
+  show ?thesis apply (subst sg1) apply (subst ring_distribs) using assms by fastforce
+qed
+
+lemma lexpo_cannot_increase_if_ak_decreases:
+  assumes "(i::nat) \<le> r" "ak' < ak"
+  shows "ak' * r - i' \<le> ak * r - i"
+proof -
+  have h: "ak' \<le> ak - 1" using assms by force
+  hence "ak' * r  \<le> (ak - 1) * r " by fastforce
+  hence  h2: "ak' * r  - i'\<le> (ak - 1) * r -i'" by linarith
+  have "(ak - 1) * r - i' \<le> ak*r - i" apply (subst diff_mult_distrib) using assms by force
+  thus ?thesis using h2 by force
+qed
+
+lemma lexpo_decreases_if_ak_decreases:
+  assumes "(i::nat)\<le>r" "1\<le>i'" "0<ak'" "ak'<ak" "0<r"
+  shows "ak'*r - i' < ak*r - i"
+proof -
+  have "0 < ak'*r" using assms(3,5) by auto
+  hence "ak' * r - 0 \<le> ak * r - r" 
+    using lexpo_cannot_increase_if_ak_decreases[OF _ assms(4)] assms by blast
+  hence "ak' * r - 1 < ak * r - r" using \<open>0<ak'*r\<close> by linarith
+  thus ?thesis using assms(1,2) by linarith
+qed
+
+lemma lexpo_cannot_increase:
+  assumes "(i::nat)\<le>r" "k\<le>k'" "k'<a" "k=k' \<longrightarrow> i\<le>i'"
+  shows "(a-k)*r - i \<ge> (a-k')*r-i'"
+  using assms proof (cases "k=k'")
+  case True
+  have "(a - k') * r - i' \<le> (a - k) * r - i'" using True by blast
+  then show ?thesis using assms(4) True by force
+next
+  case False
+  have "k<k'" using assms False by linarith
+  note assms' = assms(1,3) \<open>k<k'\<close> 
+  then show ?thesis proof (cases "i\<le>i'")
+    case True
+    have "(a - k') * r - i' \<le> (a - k') * r - i" using True by auto
+    moreover have "(a - k') * r \<le> (a - k) * r " using assms' by fastforce
+    ultimately show ?thesis by linarith
+  next
+    case False
+    hence False': "i>i'" by fastforce
+    have sg1: "a - k' < a - k" using assms' by fastforce
+    show ?thesis using lexpo_cannot_increase_if_ak_decreases[OF \<open>i\<le>r\<close> sg1] .
+  qed
+qed
+
+lemma lexpo_cannot_increase_and_decreases_if:
+  assumes "(i::nat)\<le>r" "1\<le>(i'::nat)" "i'\<le>r" "k\<le>k'" "k'<a" "k=k' \<longrightarrow> i\<le>i'"
+  shows              "(a-k') * r  - i' \<le> (a-k) * r - i" 
+    "(k<k' \<or> i<i') \<longrightarrow>(a-k') * r  - i' < (a-k) * r - i"
+  using assms 
+proof goal_cases
+  case 1
+  then show ?case using lexpo_cannot_increase[OF assms(1,4,5,6)] .
+next
+  case 2
+  then show ?case proof (cases "k=k'")
+    case True
+    have h6: "i' \<le> (a - k) * r" using lexpo_well_defined[of k a, OF _ assms(3)] assms(4,5) 
+      by fastforce
+    show ?thesis using True diff_less_mono2[of i i'] h6 by auto
+  next
+    case False
+    then show ?thesis using lexpo_decreases_if_ak_decreases assms by simp
+  qed
+qed
+
+lemma lexpo_cannot_increase_and_decreases_if':
+  assumes "(i::nat)\<le>r" "1\<le>(i'::nat)" "i'\<le>r" "k\<le>k'" "k'<a" "k=k' \<longrightarrow> i\<le>i'" "(k<k' \<or> i<i')"
+  shows "(a-k') * r  - i' < (a-k) * r - i"
+  using lexpo_cannot_increase_and_decreases_if(2)[OF assms(1-6)] using assms(7) by blast
+
+lemma prove_lexpo_decreases:
+  assumes "(k::nat)\<le>k'" "k = k' \<longrightarrow> 1 + (i::nat) \<le> i'"
+  shows "k<k' \<or> i<i'"
+  using assms by linarith
 
 context \<comment>\<open>StudyOfEvolution\<close>
   fixes l::"nat list" and rkl::"nat list" and l'::"nat list" and rkl'::"nat list"
@@ -1926,51 +2057,6 @@ qed
 
 
 \<comment>\<open>The potential @{term "\<phi> l rkl v"} cannot increase. (Lemma 4.5 on pages 18-19)\<close>
-
-
-lemma lexpo_well_defined:
-  assumes "(k::nat) < a" "i\<le>r"
-  shows "i \<le> (a-k)*r" 
-proof -
-  have sg1: "a-k = (1+ (a-k-1))" using assms by auto
-  show ?thesis apply (subst sg1) apply (subst ring_distribs) using assms by fastforce
-qed
-
-lemma lexpo_cannot_increase_if_ak_decreases:
-  assumes "(i::nat) \<le> r" "ak' < ak"
-  shows "ak' * r - i' \<le> ak * r - i"
-proof -
-  have h: "ak' \<le> ak - 1" using assms by force
-  hence "ak' * r  \<le> (ak - 1) * r " by fastforce
-  hence  h2: "ak' * r  - i'\<le> (ak - 1) * r -i'" by linarith
-  have "(ak - 1) * r - i' \<le> ak*r - i" apply (subst diff_mult_distrib) using assms by force
-  thus ?thesis using h2 by force
-qed
-
-lemma lexpo_cannot_increase:
-  assumes "(i::nat)\<le>r" "k\<le>k'" "k'<a" "k=k' \<longrightarrow> i\<le>i'"
-  shows "(a-k)*r - i \<ge> (a-k')*r-i'"
-  using assms proof (cases "k=k'")
-  case True
-  have "(a - k') * r - i' \<le> (a - k) * r - i'" using True by blast
-  then show ?thesis using assms(4) True by force
-next
-  case False
-  have "k<k'" using assms False by linarith
-  note assms' = assms(1,3) \<open>k<k'\<close> 
-  then show ?thesis proof (cases "i\<le>i'")
-    case True
-    have "(a - k') * r - i' \<le> (a - k') * r - i" using True by auto
-    moreover have "(a - k') * r \<le> (a - k) * r " using assms' by fastforce
-    ultimately show ?thesis by linarith
-  next
-    case False
-    hence False': "i>i'" by fastforce
-    have sg1: "a - k' < a - k" using assms' by fastforce
-    show ?thesis using lexpo_cannot_increase_if_ak_decreases[OF \<open>i\<le>r\<close> sg1] .
-  qed
-qed
-
 
 lemma \<phi>_cannot_increase_nonroot:
   "\<phi> l' rkl' v \<le> \<phi> l rkl v"
@@ -2303,7 +2389,7 @@ qed
 context  \<comment>\<open>Actually, the assumptions about ok and level are only needed for this context\<close>
   fixes bound::nat
   assumes  ok_hereditary: "ok l rkl x \<Longrightarrow> (x,y) \<in> (ufa_\<beta>_start l) \<Longrightarrow> ok l rkl y"
-    and level_bounded: "ok l rkl x \<Longrightarrow> x\<noteq>l!x \<Longrightarrow> (level l rkl x) < bound "
+    and level_bounded: "ok l rkl x \<Longrightarrow> x<length l \<Longrightarrow>  x\<noteq>l!x \<Longrightarrow> (level l rkl x) < bound "
 
 begin
 
@@ -2327,7 +2413,7 @@ proof -
  qed
 
 lemma bounded_levels:
-  assumes "ok l rkl x"
+  assumes "ok l rkl x" "x<length l"
   shows "levels x \<le> bound"
   apply (rule order.trans[of "levels x" "card {0..<bound}" bound])
    prefer 2 apply auto[1]
@@ -2338,8 +2424,9 @@ lemma bounded_levels:
   apply auto
 proof goal_cases
   case (1 xa)
+  have "xa<length l" using 1(1) ancestors_in_domain[OF assms(2)] by auto
   show ?case
-    apply (rule level_bounded[OF _ 1(2)])
+    apply (rule level_bounded[OF _ \<open>xa<length l\<close> 1(2)])
     using 1 assms hereditary_property[OF ok_hereditary] by fast
 qed
   
@@ -2347,26 +2434,107 @@ qed
 lemma levels_parent_if_pleasant:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)"
   shows "levels y \<le> levels x"
-  sorry
+  unfolding levels_def
+  apply (rule card_mono) proof goal_cases
+  case 1
+  have "x<length l" using assms unfolding ufa_\<beta>_start_def by blast
+  then show ?case using ancestors_in_domain[OF \<open>x<length l\<close>]
+    using subset_eq_atLeast0_lessThan_finite by blast
+next
+  case 2
+  then show ?case apply (rule image_mono) apply (rule Int_mono)
+    using ancestors_of_parent_inclusion[OF assms] by auto
+qed
+
 
 lemma levels_parent_if_unpleasant:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)" "\<not>pleasant x" "ok l rkl x"
   shows "Suc (levels y) \<le> levels x"
-  sorry
+proof -
+  have "x<length l" "y<length l" using assms(1) unfolding ufa_\<beta>_start_def by blast+
+  have fn: "finite (level l rkl ` (ancestors l y \<inter> {y. y \<noteq> l ! y}))"
+    apply (rule finite_imageI)  using ancestors_in_domain[OF \<open>y<length l\<close>]
+      subset_eq_atLeast0_lessThan_finite finite_Int by blast
+  have fn': "finite (level l rkl ` (ancestors l x \<inter> {y. y \<noteq> l ! y}))"
+    apply (rule finite_imageI)  using ancestors_in_domain[OF \<open>x<length l\<close>]
+      subset_eq_atLeast0_lessThan_finite finite_Int by blast
+  have sg: "level l rkl x \<notin> level l rkl ` ((ancestors l y) \<inter> {y. y\<noteq>l!y})"
+    unfolding ancestors_def image_def 
+  proof 
+    assume limage: " level l rkl x \<in> {ya. \<exists>x\<in>{j. (y, j) \<in> (ufa_\<beta>_start l)\<^sup>*} \<inter> {y. y \<noteq> l ! y}.
+                                      ya = level l rkl x}"
+    obtain xa where hyps: "level l rkl x = level l rkl xa"
+      "(y, xa) \<in> (ufa_\<beta>_start l)\<^sup>*" "xa \<noteq> l ! xa" using limage by auto
+    show "False" using assms(2) unfolding pleasant_def 
+    proof (safe, goal_cases)
+      case 1
+      show ?case using assms(3) .
+    next
+      case 2
+      then show ?case  using assms(1) unfolding ufa_\<beta>_start_def by fast
+    next
+      case 3
+      then show ?case using hyps assms(1) unfolding ufa_\<beta>_start_def by auto
+    qed
+  qed
+  have subs: "{x} \<subseteq> {y. y\<noteq>l!y}" using assms(1) unfolding ufa_\<beta>_start_def by fast
+  {
+    fix A::"'a set" and B::"'a set"  and C
+    assume "B \<subseteq> C"
+    have "(A \<union> B) \<inter> C = A \<inter> C \<union> B" using \<open>B\<subseteq>C\<close> by blast
+  } note inter_subs = this
+  show ?thesis unfolding levels_def 
+    apply (subst card_insert_disjoint[symmetric])
+      apply (rule fn)
+     apply (rule sg) 
+    apply (rule card_mono[OF fn']) 
+    apply (subst ancestors_of_parent[OF assms(1)])
+    apply (subst inter_subs[OF subs]) by blast
+qed
+
 
 lemma bounded_displeasure_preliminary_1:
-  assumes "(x,z)\<in> (ufa_\<beta>_start l)" "z=l!z" "ok l rkl z" 
+  assumes "(x,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "z=l!z" "ok l rkl x" "x<length l"
   shows "displeasure x \<le> levels x"
-  sorry
+  using assms proof (induction rule: converse_rtrancl_induct)
+  case base
+  show ?case using displeasure_of_root[OF base(1)] by auto
+next
+  case (step x y)
+  have yl: "y<length l" using step(1) unfolding ufa_\<beta>_start_def by blast
+  have oky: "ok l rkl y" using ok_hereditary[OF step(5,1)] .
+  show ?case proof (cases "pleasant x")
+    case True
+    have hd: "displeasure x \<le> displeasure y" 
+      using displeasure_parent_if_pleasant[OF step(1) True] by simp
+    have hc: "levels y \<le> levels x"
+      using levels_parent_if_pleasant[OF step(1)] .
+    show ?thesis using hd hc step(3)[OF step(4) oky yl] by linarith
+  next
+    case False
+    have hd: "displeasure x \<le> Suc (displeasure y)" 
+      using displeasure_parent_if_unpleasant[OF step(1) False] by simp
+    have hc: "Suc (levels y) \<le> levels x" 
+      using levels_parent_if_unpleasant[OF step(1) False step(5)] .
+    show ?thesis using hd hc step(3)[OF step(4) oky yl] by linarith
+  qed
+qed
 
 lemma bounded_displeasure_preliminary_2:
-  assumes "ok l rkl x"
+  assumes "ok l rkl x" "x<length l"
   shows "displeasure x \<le> bound"
-  sorry
+proof -
+  note path = path_from_parent_to_rep_of[OF invar_rank_ufa_invarI[OF contextasm] assms(2) refl] 
+              rep_of_min[OF invar_rank_ufa_invarI[OF contextasm] assms(2), symmetric]
+  show ?thesis using bounded_displeasure_preliminary_1[OF path assms] bounded_levels[OF assms]
+    by simp
+qed
+
 
 \<comment>\<open> As an ad hoc corollary, if every non-root non-OK vertex has an OK parent,
    then we obtain the following bound. This is useful in the special case
    where OK is defined as "non-zero-rank". \<close>
+    
 
 lemma bounded_displeasure:
   \<comment>\<open>TODO: rewrite this in a sensible way\<close>
@@ -2458,9 +2626,20 @@ begin
    which is why we end up establishing a large inequality.\<close>
 
 lemma bounded_displeasure_alstrup:
-  assumes "top_part l rkl x" 
+  assumes "top_part l rkl x" "x<length l"
   shows "pl.displeasure l rkl x \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
-  sorry
+proof (rule pl.bounded_displeasure_preliminary_2[OF contextasm ], goal_cases)
+  case (1 x y)
+  then show ?case  using top_part_hereditary[OF contextasm] by blast
+next
+  case (2 y)
+  hence "l!y < length l" using  invar_rank_ufa_invarI[OF contextasm] ufa_invarD(2) by blast
+  hence py: "(y,l!y) \<in> ufa_\<beta>_start l" unfolding ufa_\<beta>_start_def using 2 by blast
+  have hrpy: "\<alpha>\<^sub>r (rankr rkl (l ! y)) = \<alpha>\<^sub>r (rankr rkl (rep_of l (l ! y)))" 
+    using  top_part_hereditary[OF contextasm 2(1) py] unfolding top_part_def .
+  show ?case using hrpy 2(1) assms(1) unfolding top_part_def sorry
+qed (auto simp add: assms)
+
 
 \<comment>\<open>During a path compression step at x, the vertex x is the only one whose
    potential changes. So, if the potential of x decreases, then the total
@@ -2504,27 +2683,88 @@ proof -
     using conteq using sum_mono by blast
 qed
     
-   
+
+lemma compress_changes_parent_of_x_to_z:
+  assumes "x<length l"  
+  shows "(l[x:= rep_of l x])!x = rep_of l x"
+  using assms by auto
+
+lemma compress_preserves_roots_converse:
+  assumes "r = (l[x:= rep_of l x])!r"
+  shows "r = l!r"
+  using assms
+  by (metis contextasm invar_rank_ufa_invarI  nth_list_update_neq nth_update_invalid
+      rep_of_min rep_of_refl ufa_compress_aux(2))
+
 
 lemma pleasant_\<phi>:
   assumes "x<length l" "pl.pleasant l rkl x"
   shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
 proof -
+  have sg1: "top_part l rkl x" "x \<noteq> l ! x"
+    "(\<exists>y. y \<noteq> l ! y \<and> (l ! x, y) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> level l rkl x = level l rkl y)" 
+    using assms(2) unfolding pl.pleasant_def[OF contextasm] by blast+
+  have hNonRoot: "x \<noteq> l ! x" using sg1(2) .
+  have h2: "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (rep_of l x))" using sg1(1) unfolding top_part_def .
+  obtain y where 
+    h345: "y \<noteq> l ! y" "(l ! x, y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y" 
+    using sg1(3) by blast+
+  have "y < length l" using h345(2)
+    by (metis (no_types, lifting) assms(1) case_prodD contextasm invar_rank_ufa_invarI 
+        mem_Collect_eq rtrancl.simps ufa_\<beta>_start_def ufa_invarD(2))
   have h6: "(l!x, rep_of l x)\<in> (ufa_\<beta>_start l)\<^sup>*"  using assms 
     using contextasm invar_rank_ufa_invarI rep_of_bound rep_of_idx rep_of_path_iff ufa_invarD(2) 
     unfolding pl.pleasant_def[OF contextasm] by auto
   have h7: "\<alpha>\<^sub>r (rankr rkl x) \<le> \<alpha>\<^sub>r (rankr rkl (l!x))"
     using \<alpha>\<^sub>r_rankr_grows_along_edges[OF contextasm assms(1)] using assms(2) 
     unfolding pl.pleasant_def[OF contextasm] by argo
-  have h7': "(x,rep_of l x)\<in> ufa_\<beta> l"  using assms
-    unfolding pl.pleasant_def[OF contextasm] 
-    using invar_rank_ufa_invarI[OF contextasm] rep_of_min rep_of_ufa_\<beta> by fastforce 
-  have h7: "\<alpha>\<^sub>r (rankr rkl x) \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
-    using \<alpha>\<^sub>r_rankr_grows_along_a_path[OF contextasm assms(1) 
-        rep_of_bound[OF invar_rank_ufa_invarI[OF contextasm] \<open>x<length l\<close>] _ h7'] using assms(2)
-    unfolding pl.pleasant_def[OF contextasm] by fastforce
-
-    show ?thesis    sorry
+  have h8: "\<alpha>\<^sub>r (rankr rkl (l!x)) \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+    using \<alpha>\<^sub>r_rankr_grows_along_a_path_refl[OF contextasm ufa_invarD(2)
+        [OF invar_rank_ufa_invarI[OF contextasm] assms(1)]
+        rep_of_bound[OF invar_rank_ufa_invarI[OF contextasm] \<open>x<length l\<close>] h6] .
+  have h9: "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))" using h2 h7 h8 by simp
+  have hxpx: "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl ((l[x:= rep_of l x])!x))"
+    using compress_changes_parent_of_x_to_z[OF assms(1)] h2 by argo
+  note h10 = compress_evolution[OF contextasm assms(1) hNonRoot]
+  show ?thesis 
+    apply (subst \<phi>_case_2[OF hNonRoot[symmetric] h9])
+    apply (subst \<phi>_case_2[OF non_root_forever[OF contextasm h10 hNonRoot, symmetric] hxpx])
+    apply (rule add_mono1)
+  proof (rule lexpo_cannot_increase_and_decreases_if', goal_cases)
+    case 1
+    then show ?case using index_le_rank[OF contextasm assms(1) hNonRoot[symmetric]] .
+  next
+    case 2
+    then show ?case using \<open>x<length l\<close>
+        index_ge_1[OF invar_rank_evolution[OF contextasm h10] _ 
+          non_root_forever[OF contextasm h10 hNonRoot, symmetric]] by fastforce
+  next
+    case 3
+    then show ?case using \<open>x<length l\<close>
+        index_le_rank[OF invar_rank_evolution[OF contextasm h10] _
+          non_root_forever[OF contextasm h10 hNonRoot, symmetric]] by fastforce
+  next
+    case 4
+    then show ?case using level_v_grows[OF contextasm h10 \<open>x<length l\<close> hNonRoot] .
+  next
+    case 5
+    then show ?case apply (subst hxpx) using \<open>x<length l\<close>
+        level_lt_\<alpha>\<^sub>r[OF invar_rank_evolution[OF contextasm h10] _ 
+          non_root_forever[OF contextasm h10 hNonRoot, symmetric]]
+      by fastforce
+  next
+    case 6
+    then show ?case using index_v_grows_if_level_v_constant[OF contextasm h10 \<open>x<length l\<close> hNonRoot]
+      by blast
+  next
+    case 7
+    then show ?case apply (rule prove_lexpo_decreases) 
+      subgoal  using level_v_grows[OF contextasm h10 \<open>x<length l\<close> hNonRoot] .
+      subgoal using 
+          levelx_levely_compress[OF contextasm \<open>x<length l\<close> \<open>y<length l\<close> hNonRoot h345 refl ]
+        by presburger
+      done
+  qed
 qed
 
 lemma arbitrary_\<Phi>:
@@ -2599,9 +2839,10 @@ next
   then show ?case proof (cases "pl.pleasant l rkl x")
     case True
     have "x \<noteq> l!x" using step'(1) unfolding ufa_\<beta>_start_def by blast
+    have "x<length l" using step'(1) unfolding ufa_\<beta>_start_def by blast
     show ?thesis apply (subst pl.displeasure_def[OF \<open>invar_rank l rkl\<close>, symmetric])
       using pl.displeasure_parent_if_pleasant[OF \<open>invar_rank l rkl\<close> step'(1) True]
-      from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close>  pleasant_\<phi>[OF \<open>invar_rank l rkl\<close> True]]
+      from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close> pleasant_\<phi>[OF \<open>invar_rank l rkl\<close> \<open>x<length l\<close> True]]
       IH' True dpleq 
       apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l[x := rep_of l x]) rkl\<close>, symmetric])
       apply (subst (asm) eq[symmetric])+
@@ -2630,18 +2871,6 @@ lemma amortized_cost_fw_ipc_top_part:
    a path compression step at x causes the potential of x to decrease. This
    is Lemma 4.9 in Alstrup et al.'s paper.\<close>
 
-lemma compress_changes_parent_of_x_to_z:
-  assumes "x<length l"  
-  shows "(l[x:= rep_of l x])!x = rep_of l x"
-  using assms by auto
-
-lemma compress_preserves_roots_converse:
-  assumes "r = (l[x:= rep_of l x])!r"
-  shows "r = l!r"
-  using assms
-  by (metis contextasm invar_rank_ufa_invarI  nth_list_update_neq nth_update_invalid
-      rep_of_min rep_of_refl ufa_compress_aux(2))
-
 
 lemma easy_\<phi>:
   assumes "x<length l" "x\<noteq>l!x" "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))" 
@@ -2656,12 +2885,13 @@ proof -
     by blast
   note h = \<phi>_case_2_lower_bound[OF contextasm \<open>x<length l\<close> assms(2)[symmetric] assms(3)]
   have h5: "\<alpha>\<^sub>r (rankr rkl x) \<noteq> \<alpha>\<^sub>r (rankr rkl ((l[x := rep_of l x])!x))" 
-    apply (subst compress_changes_parent_of_x_to_z[OF assms(1)])
+    apply (subst compress_changes_parent_of_x_to_z[OF contextasm assms(1)])
     using assms(3,4) by linarith
-  show ?thesis using  h5 apply (subst(asm) compress_changes_parent_of_x_to_z[OF assms(1)])
+  show ?thesis using  h5 
+    apply (subst(asm) compress_changes_parent_of_x_to_z[OF contextasm assms(1)])
     using \<phi>_case_3 h
-      compress_changes_parent_of_x_to_z[OF assms(1), symmetric]
-      compress_preserves_roots_converse[of "rep_of l x" x]
+      compress_changes_parent_of_x_to_z[OF contextasm assms(1), symmetric]
+      compress_preserves_roots_converse[OF contextasm, of "rep_of l x" x]
     by (metis One_nat_def \<phi>_case_3 h less_eq_Suc_le)
 qed
 
@@ -2738,11 +2968,12 @@ next
     then show ?thesis proof (cases "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (l!x))")
       case True 
       have "x\<noteq>l!x" using step(1) unfolding ufa_\<beta>_start_def by blast
+      have "x<length l" using step(1) unfolding ufa_\<beta>_start_def by blast
       have "y = l!x" using step'(1) unfolding ufa_\<beta>_start_def by blast
       have ineq: "\<alpha>\<^sub>r (rankr rkl (l ! x)) < \<alpha>\<^sub>r (rankr rkl (rep_of l x))" using False 
         apply (subst (asm) True) using True aleq by linarith
-      note \<Phi>ineq = from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close> 
-                          easy_\<phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close> True ineq]] 
+      note \<Phi>ineq = from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close>  \<open>x\<noteq>l!x\<close> 
+                          easy_\<phi>[OF \<open>invar_rank l rkl\<close> \<open>x<length l\<close> \<open>x\<noteq>l!x\<close> True ineq]] 
       have sub1: "rep_of (l[x := rep_of l x]) y = rep_of l x" using \<open>rep_of l y = rep_of l x\<close>
         using \<open>x < length l\<close> \<open>y < length l\<close> invar_rank_ufa_invarI step.prems ufa_compress_aux(2) by auto
       show ?thesis 
