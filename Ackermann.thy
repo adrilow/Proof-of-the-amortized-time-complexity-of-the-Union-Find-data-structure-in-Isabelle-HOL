@@ -11,8 +11,8 @@ definition Ackermann where
 
 definition abase where "abase x \<equiv> Suc x"
 
-definition astep where "astep (f::nat=>nat) x \<equiv> compow (Suc x) f x"
-
+definition astep where "astep (f::nat \<Rightarrow> nat) x \<equiv> compow (Suc x) f x"
+term "compow k astep abase"
 definition Ackermann' where "Ackermann' k \<equiv> compow k astep abase"
 
 lemma Ackermann_alt_eq: "Ackermann = Ackermann'"
@@ -371,12 +371,12 @@ proof -
     by presburger
 qed
 
-\<comment>\<open>This is a version of @{term funpow_mono2} for comparing two functions on the same i\<close>
+\<comment>\<open>This is a version of @{thm funpow_mono2} for comparing two functions on the same i\<close>
 lemma compow_mono_in_f: assumes "mono (f::nat\<Rightarrow>nat)" "mono (g::nat\<Rightarrow>nat)" "\<forall>x. f x \<le> g x"
   shows "(f ^^ i) x \<le> (g ^^ i) x"
   using compow_mono_in_f_2 assms by blast
 
-\<comment>\<open>This is a version of @{term funpow_mono2} for comparing two functions instead of only
+\<comment>\<open>This is a version of @{thm funpow_mono2} for comparing two functions instead of only
   the number of iterations\<close>
 lemma compow_mono_in_f_and_i': assumes "mono (f::nat\<Rightarrow>nat)" "mono (g::nat\<Rightarrow>nat)" "inflationary g"
   "\<forall> x y. x\<le> y \<longrightarrow> f x \<le> g y" "x\<le>y" "i\<le>j"
@@ -388,7 +388,7 @@ proof goal_cases
   also have "(g ^^ i) y \<le> (g ^^ j) y"  using assms funpow_mono2 by blast
   finally show ?case .
 qed
-thm funpow_mono2 compow_mono_in_f
+thm funpow_mono2 compow_mono_in_f compow_mono_in_f_and_i'
 
 lemma Ackermann_3_lower_bound:  "compow (Suc x) ((^) 2) 0 \<le> Ackermann 3 x"
 proof -
@@ -555,6 +555,44 @@ proof goal_cases
       funpow_mono2[OF mono_Ackermann[of k] \<open>i\<le>j\<close>, of x x] Ackermann_k_inflationary[of k] by blast
 qed
 
+lemma observable_universe'':
+  "Ackermann 3 1= 2047"
+proof -
+  have "Ackermann 3 1 = (Ackermann 2 ^^ Suc 1) 1" using Ackermann_step_eq[of 2 1] by fastforce
+  also have "\<dots> = Ackermann 2 (Ackermann 2 1)" by simp
+  also have "\<dots> = Ackermann 2 7" using Ackermann_2_eq[of 1] by simp
+  also have "\<dots> = 2^8 * 8 -1" using Ackermann_2_eq[of 7] by simp
+  also have "\<dots> = 2^11 - 1" by simp
+  finally show ?thesis by auto
+qed
+
+lemma observable_universe':
+"Ackermann 4 1 \<ge> 2 ^ 2048"
+proof -
+  have trivial: "Suc 2047 = 2048" by simp
+  have "Ackermann 4 1 = (Ackermann 3 ^^ Suc 1) 1" using Ackermann_step_eq[of 3 1] by fastforce
+  also have "\<dots> = Ackermann 3 (Ackermann 3 1)" by simp
+  also have "\<dots> = Ackermann 3 2047" using observable_universe'' by argo
+  also have sg: "\<dots> = (Ackermann 2 ^^ 2048) 2047" using Ackermann_step_eq[of 2 2047] by simp
+  also have "\<dots> > Ackermann 2 2047" \<comment>\<open>This is a really big >> \<close>
+    by (metis Ackermann_strict_mono_in_k_step Suc_1 sg 
+        numeral_1_eq_Suc_0 numeral_3_eq_3 numeral_One zero_less_numeral)
+  also have "Ackermann 2 2047 = 2^(Suc 2047) * (Suc 2047) -1" using Ackermann_2_eq[of 2047] by argo
+  also have "\<dots> = 2^2048 * 2048 - 1" apply (subst trivial)+ by argo
+  finally show ?thesis by fastforce
+qed
+
+lemma observable_universe:
+"Ackermann 4 1 > 10^80"
+proof -
+  have factor: "(2048::nat) = 4 * 512"  by simp
+  have "(2::nat)^2048 = (2^4)^512" apply (subst factor) 
+    using power_mult[of 2 4 512] .
+  also have "\<dots> = 16^512" by algebra
+  finally have "(2::nat)^2048 > 10^80" by simp  \<comment>\<open>Again, very big >>\<close>
+  thus ?thesis using observable_universe' by linarith
+qed
+    
 
 (********************************************)
 section {*Inverse Ackermann function, aka \<alpha>.*}
@@ -579,6 +617,16 @@ lemma mono_\<alpha>: "mono \<alpha>"
   apply (subst \<alpha>_alt_eq)
   using A1nn.\<alpha>\<^sub>f_mono .
 
+
+lemma observable_universe_\<alpha>:
+  assumes "n \<le> 10^80" 
+  shows "\<alpha> n \<le> 4"
+proof -
+  have sg: "\<alpha>' (10^80) \<le> 4" 
+    apply (rule A1nn.\<alpha>\<^sub>f_spec_reciprocal[of "10^80" 4]) using observable_universe by linarith
+  show ?thesis apply (subst \<alpha>_alt_eq) using sg assms mono_\<alpha> unfolding mono_def
+    by (metis \<alpha>_alt_eq order_trans)
+qed
 
 context 
   fixes x::nat
@@ -694,7 +742,7 @@ lemma \<alpha>_n_0_\<alpha>_logn:
 
 
 (********************************************)
-subsection {*alphar*}
+subsection {*alphar*} 
 
 \<comment>\<open> Alstrup et al. define the function @{term alphar} as follows (page 17).
    Note that their definition of @{term Ackermann} is not the same as ours -- they

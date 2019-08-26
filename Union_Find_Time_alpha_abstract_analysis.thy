@@ -1543,8 +1543,10 @@ lemma compress_preserves_paths_out_of_y:
   case base
   then show ?case by blast
 next
-  case (step y z)
-  have "(y, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])" sorry
+  case (step y0 z)
+  hence "y0\<noteq>x" using paths_have_distinct_endpoints sorry
+  hence "(y0, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])" 
+    using step compress_preserves_other_edges by blast
   then show ?case using step by fastforce
 qed
 
@@ -2182,7 +2184,7 @@ section{*Abstract definition of iterated path compression (UnionFind05IteratedCo
 inductive bw_ipc
   where
   BWIPCBase: "x=l!x \<Longrightarrow> bw_ipc l x 0 l"
-| BWIPCStep: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> bw_ipc l y i l' \<Longrightarrow> bw_ipc l x (Suc i) (l'[x:= rep_of l' x])"
+| BWIPCStep: "(x,y)\<in>(ufa_\<beta>_start l) \<Longrightarrow> bw_ipc l y i l' \<Longrightarrow> bw_ipc l x (Suc i) (l'[x:= rep_of l x])"
 
 inductive fw_ipc
   where
@@ -2223,16 +2225,19 @@ proof -
   thus ?thesis  using sg1 ipc_defined_preliminary[OF assms(1)] by blast
 qed
 
+
+no_notation Ref.update ("_ := _" 62)
+
 lemma compress_preserves_roots_other_than_x:
   assumes "r\<noteq>x" "r=l!r"
-  shows "r=l[x:=rep_of l x]!r"
+  shows "r=l[x:=z]!r"
   using assms by simp
-thm fw_ipc.induct
 
 
+(*
 lemma fw_ipc_compress_preliminary:
   assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
-  shows "fw_ipc (l[x:= rep_of l x]) y i (l'[x:=rep_of l x])"
+  shows "fw_ipc (l[x := rep_of l x]) y i (l'[x := rep_of l x])"
   using assms proof (induction l y i l' rule: fw_ipc.induct)
   case base: (FWIPCBase x' l)
   have "x'\<noteq>x" using base(2) by fast
@@ -2257,12 +2262,72 @@ next
     by (metis list_update_swap sg0')
   show ?case using FWIPCStep[OF sg1 sg3] .
 qed
+*)
 
+lemma compress_preserves_paths_converse:
+  assumes "(x,y)\<in>(ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" 
+          "(u,w)\<in> (ufa_\<beta>_start (l[x:=z]))\<^sup>*"
+        shows "(u,w)\<in> (ufa_\<beta>_start l)\<^sup>*"
+  using assms(3) proof (induction rule: converse_rtrancl_induct)
+  case (step y z)
+  then show ?case 
+    by (smt Pair_inject assms(1,2) case_prodD converse_rtrancl_into_rtrancl length_list_update 
+        mem_Collect_eq nth_list_update_eq nth_list_update_neq old.prod.exhaust prod.simps(2) 
+        rtrancl.rtrancl_into_rtrancl rtrancl.rtrancl_refl rtrancl_trans ufa_\<beta>_start_def)
+qed blast
+
+lemma compress_preserves_rep_of_weak:
+  assumes "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
+  shows "rep_of (l[x:=z]) y = rep_of l y"
+  sorry
+
+lemma fw_ipc_compress_preliminary:
+  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
+  shows "fw_ipc (l[x := z]) y i (l'[x := z])"
+  using assms proof (induction l y i l' rule: fw_ipc.induct)
+  case base: (FWIPCBase y0 l)
+  show ?case apply (rule FWIPCBase)
+    apply (rule compress_preserves_roots_other_than_x[OF _ base(1), of x z])
+    using base.prems(1) by blast
+next
+  case step: (FWIPCStep y z' l i l')
+  have sg1: "(z', rep_of l z') \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_path_iff[OF \<open>ufa_invar l\<close>, of z'] 
+      step(1) rep_of_bound[OF \<open>ufa_invar l\<close>, of z'] unfolding ufa_\<beta>_start_def sorry
+  have IHfw_ipc: "fw_ipc (l[y := rep_of l z', x := z]) z' i (l'[x := z])" 
+    apply (rule step(3))
+    subgoal apply (rule ccontr)
+    using compress_preserves_paths_converse[OF step(1) sg1, of z' x] step(4)
+    by (meson converse_rtrancl_into_rtrancl step.hyps(1))
+  using rep_of_idx step.hyps(1) step.prems(2) ufa_compress_invar unfolding ufa_\<beta>_start_def by force
+  show ?case apply (rule FWIPCStep[of y z' "l[x:=z]" i "l'[x:=z]"])
+    defer
+    using step(3) compress_preserves_rep_of_weak[OF step(4)] sorry
+qed
+
+notation Ref.update ("_ := _" 62)
+
+lemma fw_ipc_compress:
+  assumes "ufa_invar l" "(x,y)\<in>(ufa_\<beta>_start l)" "fw_ipc l y i l'"
+  shows "fw_ipc (l[x := rep_of l y]) y i (l'[x := rep_of l y])"
+  apply (rule fw_ipc_compress_preliminary[OF assms(3) _ assms(1), of x "rep_of l y"])
+  using assms(2) aciclicity[OF assms(1)] unfolding ufa_\<beta>_def ufa_\<beta>_start_def
+  by (metis (no_types, lifting) mem_Collect_eq old.prod.case rtrancl_into_trancl1)
 
 lemma bw_ipc_fw_ipc:
   assumes "ufa_invar l" "bw_ipc l x i l'" 
   shows "fw_ipc l x i l'"
-  sorry
+  using assms(2,1) proof induction
+  case base: (BWIPCBase x l)
+  show ?case using FWIPCBase[OF base(1)] .
+next
+  case step: (BWIPCStep x y l i l')
+  have sg1: "rep_of l x = rep_of l y" using step(1) rep_of_idx[OF step.prems]
+    unfolding ufa_\<beta>_start_def by force
+  show ?case      
+    apply (rule FWIPCStep[OF step(1)])
+    using 
+      fw_ipc_compress[OF step(4) step(1) step(3)[OF step(4)]] sg1 by argo
+qed
 
 lemma fw_ipc_bw_ipc:
   assumes "ufa_invar l" "fw_ipc l x i l'"
@@ -2579,8 +2644,6 @@ context \<comment>\<open>invar_rank\<close>
 begin
 
 
-
-
 lemma top_part_hereditary:
   assumes  "top_part l rkl x" "(x,y)\<in>(ufa_\<beta>_start l)"
   shows "top_part l rkl y"
@@ -2588,12 +2651,17 @@ lemma top_part_hereditary:
 proof -
   have "ufa_invar l" using contextasm unfolding invar_rank_def by blast
   have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  have "y<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  have h2: "(x,y)\<in>(ufa_\<beta>_start l)\<^sup>*" using assms(2) by blast
   have h3: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_ufa_\<beta>_refl[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] assms(2) 
     by (smt \<open>ufa_invar l\<close> case_prodD mem_Collect_eq rep_of_bound rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
+  hence "rep_of l x < length l"  by (simp add: \<open>ufa_invar l\<close> \<open>x < length l\<close> rep_of_bound)
   have h4: "rep_of l x = rep_of l y" using assms \<open>ufa_invar l\<close> rep_of_idx 
-      unfolding ufa_\<beta>_start_def by force
-    thus ?thesis unfolding top_part_def 
-      sorry
+    unfolding ufa_\<beta>_start_def by force
+  show ?thesis unfolding top_part_def using assms(1) h4
+        \<alpha>\<^sub>r_rankr_grows_along_a_path_refl[OF contextasm \<open>y<length l\<close> \<open>rep_of l x < length l\<close> h3]
+        \<alpha>\<^sub>r_rankr_grows_along_a_path_refl[OF contextasm \<open>x<length l\<close> \<open>y<length l\<close> h2]
+      unfolding top_part_def by simp
   qed
   
 
@@ -2605,7 +2673,8 @@ proof -
   have sg1: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using assms(1)
     by (smt case_prodD contextasm invar_rank_ufa_invarI mem_Collect_eq rep_of_bound
         rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
-  show ?thesis using assms(2)
+  show ?thesis using assms(2) 
+      compress_preserves_rep_of_direct[OF assms(1) invar_rank_ufa_invarI[OF contextasm] sg1 refl]
   unfolding top_part_def 
   sorry 
 qed
@@ -2637,7 +2706,8 @@ next
   hence py: "(y,l!y) \<in> ufa_\<beta>_start l" unfolding ufa_\<beta>_start_def using 2 by blast
   have hrpy: "\<alpha>\<^sub>r (rankr rkl (l ! y)) = \<alpha>\<^sub>r (rankr rkl (rep_of l (l ! y)))" 
     using  top_part_hereditary[OF contextasm 2(1) py] unfolding top_part_def .
-  show ?case using hrpy 2(1) assms(1) unfolding top_part_def sorry
+  show ?case
+    using hrpy 2(1) assms(1) level_lt_\<alpha>\<^sub>r[OF contextasm 2(2) 2(3)[symmetric]]  unfolding top_part_def sorry
 qed (auto simp add: assms)
 
 
@@ -2860,10 +2930,10 @@ qed
 
 
 lemma amortized_cost_fw_ipc_top_part:
-  assumes "fw_ipc l x i l'" "top_part l rkl x"
+  assumes "fw_ipc l x i l'" "top_part l rkl x" "x<length l"
   shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
-  using amortized_cost_fw_ipc_top_part_inductive[OF assms] 
-        bounded_displeasure_alstrup[OF contextasm assms(2)] 
+  using amortized_cost_fw_ipc_top_part_inductive[OF assms(1,2)] 
+        bounded_displeasure_alstrup[OF contextasm assms(2,3)] 
   by linarith
 
 \<comment>\<open>Say x is "easy" if @{term "alphar \<circ> (rankr rkl)"} is NOT constant all the way from x
@@ -2958,7 +3028,8 @@ next
     case True
     hence "top_part l rkl x" unfolding top_part_def .
     show ?thesis using amortized_cost_fw_ipc_top_part[OF \<open>invar_rank l rkl\<close> 
-                       FWIPCStep[OF step(1) step(2)] \<open>top_part l rkl x\<close>] True by linarith
+                       FWIPCStep[OF step(1) step(2)] \<open>top_part l rkl x\<close> \<open>x<length l\<close>] True 
+         by linarith
   next
     case False
     have ir':"invar_rank (l[x := rep_of l x]) rkl" using  
