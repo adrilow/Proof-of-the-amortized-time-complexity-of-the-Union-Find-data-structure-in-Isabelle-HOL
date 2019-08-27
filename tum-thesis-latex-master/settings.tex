@@ -19,17 +19,38 @@
 \usepackage{listings}
 \usepackage{lstautogobble}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,decorations.markings,calc}
 \usepackage{pgfplots}
 \usepackage{pgfplotstable}
 \usepackage{booktabs}
 \usepackage[final]{microtype}
 \usepackage{caption}
+\usepackage{subcaption}
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{isabelle}
+\usepackage{alltt}
 \newtheorem*{thm}{Theorem}
 \newtheorem*{lemma}{Lemma}
 \newtheorem*{definition}{Definition}
 \usepackage{enumerate}
 \usepackage[hidelinks,final]{hyperref} % hidelinks removes colored boxes around references and links
+
+ \usepackage{ifthen}
+
+\newcommand{\DefineSnippet}[2]{%
+	\expandafter\newcommand\csname snippet--#1\endcsname{%
+		\begin{quote}
+			\begin{isabelle}
+				#2
+			\end{isabelle}
+\end{quote}}}
+\newcommand{\Snippet}[1]{%
+	\ifcsname snippet--#1\endcsname{\csname snippet--#1\endcsname}%
+	\else+++++++ERROR: Snippet ``#1 not defined+++++++ \fi}
+
+%\input{generated/snippets}
+
+
 
 \bibliography{bibliography}
 
@@ -61,6 +82,24 @@
   % For available color names, see http://www.latextemplates.com/svgnames-colors
   cycle list={TUMBlue\\TUMAccentOrange\\TUMAccentGreen\\TUMSecondaryBlue2\\TUMDarkGray\\},
 }
+
+
+\tikzset{
+	treenode/.style = {align=center, inner sep=0pt, text centered,
+		font=\sffamily},
+	arn_n/.style = {treenode, circle, white, font=\sffamily\bfseries, draw=black,
+		fill=black, text width=1.5em},% arbre rouge noir, noeud noir
+	arn_r/.style = {treenode, circle, red, draw=red, 
+		text width=1.5em, very thick},% arbre rouge noir, noeud rouge
+	arn_x/.style = {treenode, rectangle, draw=black,
+		minimum width=0.5em, minimum height=0.5em},% arbre rouge noir, nil
+	dsf1/.style = {treenode, circle, black, draw=black, fill=TUMAccentLightBlue,
+	text width=1.5em, thick},
+	dsf2/.style = {treenode, circle, black, draw=black, fill=TUMAccentOrange,
+	text width=1.5em, thick},
+	first/.style = {treenode, circle, white, draw=white,}
+}
+
 
 % Settings for lstlistings
 \lstset{%

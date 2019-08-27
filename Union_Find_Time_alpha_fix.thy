@@ -11,9 +11,16 @@ text {* In this section, we implement the union-find data-structure with
   the complexity of the algorithm.
 *}
 
+
+text_raw\<open>\DefineSnippet{uf_definition}{\<close>
+
 type_synonym uf = "nat array \<times> nat array"
 
+text_raw\<open>}\<close>
+
 subsection{*Imperative HOL implementation*}
+
+text_raw\<open>\DefineSnippet{uf_init}{\<close>
 
 definition uf_init :: "nat \<Rightarrow> uf Heap" where 
   "uf_init n \<equiv> do {
@@ -22,6 +29,9 @@ definition uf_init :: "nat \<Rightarrow> uf Heap" where
     return (szl,l)
   }"
 
+text_raw\<open>}\<close>
+
+text_raw\<open>\DefineSnippet{uf_cmp}{\<close>
 
 partial_function (heap) uf_rep_of :: "nat array \<Rightarrow> nat \<Rightarrow> nat Heap" 
   where [code]: 
@@ -31,7 +41,6 @@ partial_function (heap) uf_rep_of :: "nat array \<Rightarrow> nat \<Rightarrow> 
   }"
 
 
-text {* We chose a non tail-recursive version here, as it is easier to prove. *}
 partial_function (heap) uf_compress :: "nat \<Rightarrow> nat \<Rightarrow> nat array \<Rightarrow> unit Heap" 
   where [code]: 
   "uf_compress i ci p = (
@@ -63,6 +72,8 @@ definition uf_cmp :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool 
     }
   }"
 
+text_raw\<open>}\<close>
+
 (* OLD union, with merge by size
 definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf Heap" where 
   "uf_union u i j \<equiv> do {
@@ -85,6 +96,8 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
     }
   }"
 *)
+
+text_raw\<open>\DefineSnippet{uf_union}{\<close>
 
 definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf Heap" where 
   "uf_union u i j \<equiv> do {
@@ -110,5 +123,7 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
       }
     }
   }"
+
+text_raw\<open>}\<close>
 
 end
