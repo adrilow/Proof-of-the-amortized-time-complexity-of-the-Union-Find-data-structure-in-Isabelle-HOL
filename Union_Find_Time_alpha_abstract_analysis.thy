@@ -1723,7 +1723,7 @@ qed
 \<comment>\<open>This is only an application of @{thm ufa_union_correct}\<close>
 lemma dsf_per_add_edge_by_rank: "False" oops 
 
-\<comment>\<open>The second part of UnionFind13RankLink seems to specific to be needed, but maybe it
+\<comment>\<open>The second part of UnionFind13RankLink seems too specific to be needed, but maybe it
 is useful to have some explicit lemmas about rep_of under union_by_rank\<close>
 
 
@@ -2223,6 +2223,21 @@ proof -
   have sg1: "(x,rep_of l x)\<in> (ufa_\<beta>_start l)\<^sup>*" unfolding ufa_\<beta>_def using assms rep_of_ufa_\<beta>_refl by blast
   have "rep_of l x = l!rep_of l x" by (simp add: assms rep_of_min)
   thus ?thesis  using sg1 ipc_defined_preliminary[OF assms(1)] by blast
+qed
+
+
+
+lemma height_of_ipc_equiv:
+  assumes "bw_ipc l x d l'"  "ufa_invar l" "x<length l" 
+  shows "d = height_of l x"
+  using assms proof (induction rule: bw_ipc.induct)
+  case (BWIPCBase x l)
+  then show ?case 
+    using h_rep rep_of_iff by fastforce 
+next
+  case (BWIPCStep x y l i l')
+  then show ?case unfolding ufa_\<beta>_start_def 
+    using height_of_step by auto
 qed
 
 
