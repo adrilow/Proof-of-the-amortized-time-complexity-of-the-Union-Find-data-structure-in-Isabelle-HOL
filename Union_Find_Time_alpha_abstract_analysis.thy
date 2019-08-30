@@ -1539,15 +1539,18 @@ begin \<comment>\<open>invar\<close>
 lemma compress_preserves_paths_out_of_y:
   assumes "(v,w)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y,v)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= rep_of l x]))\<^sup>*"
-  using assms(1) proof (induction rule: converse_rtrancl_induct)
+  using assms(1,2)  x_edge_y proof (induction rule: converse_rtrancl_induct)
   case base
   then show ?case by blast
 next
   case (step y0 z)
-  hence "y0\<noteq>x" using paths_have_distinct_endpoints sorry
-  hence "(y0, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])" 
+  have "y0\<noteq>x" using paths_have_distinct_endpoints using step 
+    by (metis (no_types, lifting) aciclicity inv mem_Collect_eq prod.simps(2) 
+        rtrancl_into_trancl2 ufa_\<beta>_def ufa_\<beta>_start_def)
+  hence sg1: "(y0, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])" 
     using step compress_preserves_other_edges by blast
-  then show ?case using step by fastforce
+  have "(y, z) \<in> (ufa_\<beta>_start l)\<^sup>*" using step by auto
+  then show ?case using step sg1 by fastforce
 qed
 
 lemma compress_preserves_paths_out_of_z:
@@ -1555,29 +1558,37 @@ lemma compress_preserves_paths_out_of_z:
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= rep_of l x]))\<^sup>*"
   using compress_preserves_paths_out_of_y[OF assms(1)] pathyz assms(2) rtrancl_trans by fast
 
-
 lemma compress_preserves_paths_to_roots:
   assumes "(v,r)\<in>(ufa_\<beta>_start l)\<^sup>*" "r=l!r"
   shows "(v,r)\<in>(ufa_\<beta>_start (l[x:= rep_of l x]))\<^sup>*"
   using assms pathyz x_edge_y inv
-proof (induction)
-case base
-then show ?case by blast
+proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
 next
-  case (step y z)
-  then show ?case proof (cases "x = v")
+  case (step y0 z)
+  have sg1:  "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using x_edge_y using pathyz by blast
+  then show ?case  proof (cases "y0=x")
     case True
-    from step True show ?thesis 
-      by (smt case_prodD length_list_update mem_Collect_eq rep_of_bound rep_of_idx 
-          rep_of_invar_along_path rep_of_path_iff rep_of_refl ufa_\<beta>_start_def ufa_compress_aux(2) 
-          ufa_compress_invar)
+    have "x<length l" using x_edge_y unfolding ufa_\<beta>_start_def by blast
+    have "r<length l" using step(1,2)
+      by (metis (no_types, lifting) True case_prodD mem_Collect_eq rtrancl.simps ufa_\<beta>_start_def) 
+    have "(x,r)\<in> (ufa_\<beta>_start l)\<^sup>*" using step(1,2) True by simp
+    hence "r = rep_of l x" using step(1,2,4) True 
+        rep_of_path_iff[OF \<open>ufa_invar l\<close> \<open>r<length l\<close> \<open>x<length l\<close>] by presburger
+    hence "r = rep_of (l[x:= rep_of l x]) x" using rep_of.psimps 
+      by (simp add: \<open>x < length l\<close> inv ufa_compress_aux(2))
+    show ?thesis using step
+      by (simp add: True \<open>r = rep_of (l[x := rep_of l x]) x\<close> \<open>x < length l\<close> 
+          rep_of_ufa_\<beta>_refl ufa_compress_invar)
   next
     case False
-    show ?thesis apply (rule converse_rtrancl_into_rtrancl)
-      using compress_preserves_other_edges[OF _ False[symmetric], of y] step 
-      sorry
+    have "(y0, z) \<in> ufa_\<beta>_start (l[x := rep_of l x])"
+      using step False compress_preserves_other_edges by blast
+    then show ?thesis  using step by fastforce
   qed
 qed
+
 
 lemma compress_preserves_rep_of_direct:
   assumes "r = rep_of l x"
@@ -2126,17 +2137,165 @@ qed
 
 end  \<comment>\<open>StudyOfEvolution\<close>
 
+lemma random_arithmetic_lemma_00:
+  assumes "(c::nat)\<le>b" "a + b + d \<le> e + c"
+  shows "a + (b - c + d) \<le> e"
+  using assms by auto
+
+lemma random_arithmetic_lemma_000:
+  assumes "(a::nat)\<le>b" "c \<le> d + a"
+  shows "c \<le> d + b" using assms by linarith
+
+
+lemma random_arithmetic_lemma_01:
+  assumes "(1::nat)\<le>kx" "(1::nat)\<le>ix" "kx<ary" "ix \<le> (ary - kx)*ry"
+  shows  
+    "ary * (ry + 1 + 1) + ((ary - kx) * ry - ix + 1) \<le> ary * (ry + 1) + ary * (ry + 1) + slack"
+proof -
+  have aryeq: "ary = (ary - kx) + kx" using assms by auto
+    obtain arykx where arykx_eq: "arykx = (ary - kx)" by blast
+  show ?thesis apply (subst arykx_eq[symmetric])
+      apply (subst aryeq) apply (subst(2) aryeq) apply (subst(3) aryeq)
+    apply (rule random_arithmetic_lemma_00)
+    subgoal using assms(4) arykx_eq by blast
+    apply (rule random_arithmetic_lemma_000[OF assms(2)])
+     apply (subst arykx_eq) using assms
+    by (simp add: algebra_simps)
+qed
+    
+lemma random_arithmetic_lemma_001:
+  assumes "(a::nat)\<le>b" "b*c \<le> d"
+  shows "a*c \<le>d"
+  using assms 
+  by (meson dual_order.refl mult_le_mono order_trans)
+
+lemma random_arithmetic_lemma_02:
+  assumes "(1::nat)\<le>ary"
+  shows "(ary + 1) * (ry + 1 + 1) + 0 \<le> ary * (ry + 1) + ary * (ry + 1) + 2"
+  using assms by (simp add: algebra_simps)
 
 \<comment>\<open>The increase of the potential \<Phi> during a link is at most 2. This is
    Lemma 4.7 on page 19. The formal proof follows roughly the paper proof,
    except we find it necessary to make certain case analyses explicit.\<close>
+ 
 
 lemma potential_increase_during_link_preliminary:
   assumes "invar_rank l rkl" "x\<noteq>y" "x<length l" "y<length l" "x=l!x" "y=l!y" 
   "(rkl!x < rkl!y \<and> rkl' = rkl) \<or> (rkl!x = rkl!y \<and> rkl'= rkl[y:= Suc (rkl!y)])"
   "evolution l rkl (ufa_union l x y) rkl'"
 shows "\<Phi> (ufa_union l x y) rkl' \<le> \<Phi> l rkl + 2 "
-  sorry \<comment>\<open>:-)\<close>
+proof (cases "rkl!y = rkl'!y")
+  case True
+  hence True': "rankr rkl y = rankr rkl' y" unfolding rankr_def by presburger
+  have leq: "length (ufa_union l x y) = length l" by simp 
+  show ?thesis apply (subst \<Phi>_simp)+ 
+    apply (rule trans_le_add1)
+    apply (subst leq)
+    apply (rule sum_mono)
+  proof (goal_cases)
+    case (1 i)
+    hence "i<length l" by simp
+    have rankeq: "rankr rkl i = rankr rkl' i" apply (cases "i=y") apply (simp add: True') 
+      by (metis True assms(7) list_update_id list_update_overwrite)
+    show ?case using  \<phi>_v_cannot_increase[OF assms(1,8) \<open>i<length l\<close> rankeq] .
+  qed
+next
+  case False
+  have leq: "length (ufa_union l x y) = length l" by simp 
+  have assm': "rkl!x = rkl!y" "rkl'= rkl[y:= Suc (rkl!y)]" using assms(7) False by auto
+  have hKx: "rankr rkl x = rankr rkl y" using assm'(1) unfolding rankr_def by presburger
+  have hK'y: "rankr rkl' y = Suc (rankr rkl y)" 
+    unfolding rankr_def apply (subst add_Suc[symmetric]) 
+    using assm'(2)  assms(1,4) unfolding invar_rank_def by auto
+
+  have hF: "ufa_union l x y = union_by_rank_l l rkl y x"
+    unfolding union_by_rank_l_def by (simp add: assm'(1))
+  have hK: "rkl' = union_by_rank_rkl rkl y x"
+    unfolding union_by_rank_rkl_def by (simp add: assm')
+  have h8: "invar_rank (ufa_union l x y) rkl'" 
+    apply (subst hF) apply (subst hK)
+    using invar_rank_link[OF assms(1,4,3,6,5) assms(2)[symmetric]] .
+
+  have part1: "sum (\<phi> (ufa_union l x y) rkl') ({0..<length l} - {x, y}) 
+              \<le> sum (\<phi> l rkl) ({0..<length l} - {x, y})"
+    apply (rule sum_mono)
+  proof goal_cases
+    case (1 i)
+    hence "i<length l" by simp
+    have rankeq: "rankr rkl i = rankr rkl' i" using 1 by (simp add: assm'(2) rankr_def)
+    show ?case  using  \<phi>_v_cannot_increase[OF assms(1,8) \<open>i<length l\<close> rankeq] .
+  qed
+
+  have hK'x: "rankr rkl x = rankr rkl' x" using assm'(2) assms(2) unfolding rankr_def by auto
+  have hpx: " ufa_union l x y ! x = y" 
+    using ufa_union_sets_parent[OF invar_rank_ufa_invarI[OF assms(1)] assms(3,4,5)] assms(4,6) 
+          rep_of_refl by simp
+  have hkx: "1 \<le> level (ufa_union l x y) rkl' x" using level_def[OF h8, of x] leq assms(2,3) hpx 
+    by linarith
+  have hix: "1 \<le> index (ufa_union l x y) rkl' x" using index_ge_1[OF h8, of x] leq assms(2,3) hpx
+    by presburger
+
+  have is_root_y:"ufa_union l x y ! y = y" using assms(4,6) by(metis assms(2,5) hpx nth_list_update')
+  note hy = \<phi>_case_1[OF assms(6)[symmetric], of rkl]
+  note hy2 = \<phi>_case_1[OF is_root_y, of rkl']
+  note hx =  \<phi>_case_1[OF assms(5)[symmetric], of rkl]
+  have is_not_root_x: "ufa_union l x y ! x \<noteq> x" using hpx assms(2) by argo
+  
+  have partxy: "\<phi> (ufa_union l x y) rkl' x + \<phi> (ufa_union l x y) rkl' y \<le> \<phi> l rkl x +  \<phi> l rkl y + 2" 
+    apply (subst hy) apply (subst hy2) apply (subst hx)
+    apply (cases "\<alpha>\<^sub>r (rankr rkl' x) = \<alpha>\<^sub>r (rankr rkl' y)") proof goal_cases
+    case 1 \<comment>\<open>True\<close>
+    have hx2: "\<phi> (ufa_union l x y) rkl' x =
+              (\<alpha>\<^sub>r (rankr rkl' x) - level (ufa_union l x y) rkl' x) *
+              rankr rkl' x - index (ufa_union l x y) rkl' x + 1"
+      using \<phi>_case_2[OF is_not_root_x, of rkl'] 1 hpx by argo
+
+    have h9: "level (ufa_union l x y) rkl' x < \<alpha>\<^sub>r (rankr rkl' x)" using
+          \<phi>_case_2_safe_level[OF h8, of x] leq assms(3) is_not_root_x 1 hpx by argo
+    have h10: "index (ufa_union l x y) rkl' x
+      \<le> (\<alpha>\<^sub>r (rankr rkl' x) -  level (ufa_union l x y) rkl' x) * rankr rkl' x" 
+      using \<phi>_case_2_safe_index[OF h8, of x] leq assms(3) is_not_root_x 1 hpx by argo
+    have hranks: "\<alpha>\<^sub>r (rankr rkl y) = \<alpha>\<^sub>r (Suc (rankr rkl y))" using 1 hK'x hKx hK'y by argo
+
+    obtain ix where ixeq: "ix = index (ufa_union l x y) rkl' x" by blast
+    obtain kx where kxeq: "kx = level (ufa_union l x y) rkl' x" by blast
+    obtain ary where aryeq: "ary = \<alpha>\<^sub>r (rankr rkl y)" by blast
+    obtain rx where rxeq: "rx = rankr rkl y" by blast
+
+    show ?case apply (subst hx2) apply (subst hK'x[symmetric])+ apply (subst hKx)+ apply (subst hK'y)+
+      apply (subst hranks[symmetric]) 
+      apply (subst ixeq[symmetric])+  apply (subst kxeq[symmetric])+
+      apply (subst aryeq[symmetric])+ apply (subst rxeq[symmetric])+
+      apply (subst Suc_eq_plus1)+
+      apply (subst add.commute[of _ " ary * (rx + 1 + 1)"])
+      apply (rule random_arithmetic_lemma_01[of kx ix ary rx 2])
+      subgoal using kxeq hkx by blast
+      subgoal using ixeq hix by blast
+      subgoal using kxeq aryeq h9 1 hK'x hKx by argo
+      subgoal using ixeq aryeq kxeq rxeq h10 hK'x hKx by argo
+      done
+  next
+    case 2 \<comment>\<open>False\<close>
+    have h: "\<phi> (ufa_union l x y) rkl' x = 0" 
+      using  \<phi>_case_3[OF is_not_root_x , of rkl'] 2 hpx by argo
+    show ?case apply (subst h) apply (subst hKx)+ apply (subst hK'y)+
+      apply (subst add_0)
+      apply (rule random_arithmetic_lemma_001[OF alphar_grows_one_by_one[OF \<rho>_gt_0, of "rankr rkl y"]])
+      apply (subst Suc_eq_plus1)+
+      apply (subst add_0_right[symmetric, of "(\<alpha>\<^sub>r (rankr rkl y) + 1) * (rankr rkl y + 1 + 1)"])
+      apply (rule random_arithmetic_lemma_02)
+      unfolding alphar_def[OF \<rho>_gt_0] by simp
+  qed
+
+  have f1: "finite ({0..<length l} - {x,y})" by blast
+  have f2: "finite {x,y}" by blast
+  have disj: "({0..<length l} - {x, y}) \<inter> {x, y} = {}" by blast
+  have sep: "{0..<length l} = ({0..<length l} - {x,y}) \<union> {x,y}" using assms(3,4) by fastforce
+  { fix f::"nat\<Rightarrow>nat" have  "(sum f {x, y}) = (f x) + (f y)" using assms(2) by auto}note split=this
+  show ?thesis apply (subst \<Phi>_simp)+ apply (subst leq) apply (subst sep) apply (subst (2) sep)
+    apply (subst sum.union_disjoint[OF f1 f2 disj])+ apply (subst split)+
+    using part1 partxy by linarith
+qed
 
 
 lemma potential_increase_during_link:
@@ -2292,9 +2451,27 @@ lemma compress_preserves_paths_converse:
 qed blast
 
 lemma compress_preserves_rep_of_weak:
-  assumes "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
+  assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
   shows "rep_of (l[x:=z]) y = rep_of l y"
-  sorry
+proof -
+  have "y\<noteq>x" using assms unfolding ufa_\<beta>_start_def by blast
+  show ?thesis using assms(1,3,2,4,5) \<open>y\<noteq>x\<close> proof (induction rule:rep_of_induct)
+    case (base i)
+    then show ?case using rep_of_refl by auto
+  next
+    case (step i)
+    have " rep_of (l[x := z]) (l ! i) = rep_of l (l ! i)" sorry
+    have "ufa_invar (l[x := z])" using assms(1) unfolding ufa_invar_def
+    proof (safe, goal_cases)
+      case (1 i)                       
+      then show ?case using rep_of.domintros
+    next
+      case (2 i)
+      then show ?case sorry
+    qed
+    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>]
+  qed
+qed
 
 lemma fw_ipc_compress_preliminary:
   assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
@@ -2367,6 +2544,8 @@ section{*Lemmas about pleasantness (UnionFind24Pleasant)*}
 \<comment>\<open> We parameterize these definitions and lemmas over a predicate ok and a
    level function, so that they work both for Tarjan's original proof and
    for Alstrup et al.'s proof. \<close>
+
+\<comment>\<open>ok will be top_part and level will be level\<close>
 
 locale Pleasant = \<comment>\<open>Pleasant\<close>
   fixes ok::"nat list \<Rightarrow> nat list \<Rightarrow> nat \<Rightarrow> bool"
@@ -2632,6 +2811,8 @@ context \<comment>\<open>Preservation\<close>
  and compress_preserves_ok_above_y:
     "\<lbrakk>(x,y)\<in> (ufa_\<beta>_start l); (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> \<Longrightarrow> ok (l[x:= rep_of l y]) rkl v"
 begin
+no_notation Ref.update ("_ := _" 62)
+
 
 lemma compress_preserves_pleasant_above_y:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,v)\<in> (ufa_\<beta>_start l)\<^sup>*" "pleasant l rkl v"
@@ -2643,6 +2824,8 @@ lemma compress_preserves_displeasure_of_y:
   shows "displeasure (l[x:= rep_of l y]) rkl y \<le> displeasure l rkl y "
   sorry
 
+
+notation Ref.update ("_ := _" 62)
 end \<comment>\<open>Preservation\<close>
 
 end \<comment>\<open>Pleasant\<close>
