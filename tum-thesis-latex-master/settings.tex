@@ -19,7 +19,7 @@
 \usepackage{listings}
 \usepackage{lstautogobble}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,decorations.markings,calc,shapes.geometric}
+\usetikzlibrary{arrows.meta,decorations.markings,calc,shapes.geometric,shadows,arrows}
 \usepackage{pgfplots}
 \usepackage{pgfplotstable}
 \usepackage{booktabs}
@@ -29,6 +29,8 @@
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
 \usepackage{isabelle}
 \usepackage{alltt}
+\usepackage{bussproofs}
+\usepackage{verbatim}
 \newtheorem*{thm}{Theorem}
 \newtheorem*{lemma}{Lemma}
 \newtheorem*{theorem}{Theorem}
@@ -134,6 +136,68 @@ letria/.style={
 	isosceles triangle,isosceles triangle apex angle=110,
 	shape border rotate=235,yshift=0.1cm}
 }
+
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{foreground}
+\pgfsetlayers{background,main,foreground}
+
+% Define block styles  
+\tikzstyle{materia}=[draw, fill=TUMAccentLightBlue, text width=6.0em, text centered,
+minimum height=1.5em]
+\tikzstyle{practica} = [materia, minimum width=5em,
+minimum height=3em, rounded corners]
+\tikzstyle{texto} = [above, text centered]
+\tikzstyle{linepart} = [draw, thick, color=black!50, -latex', dashed]
+\tikzstyle{line} = [draw, thick, color=black!50, -latex']
+\tikzstyle{ur}=[draw, text centered, minimum height=0.01em]
+
+% Define distances for bordering
+\newcommand{\blockdist}{1.3}
+\newcommand{\edgedist}{1.5}
+
+
+\tikzstyle{materiaa}=[draw, fill=TUMLightGray, text width=6.0em, text centered,
+minimum height=1.5em]
+\tikzstyle{practicaa} = [materiaa, minimum width=5em,
+minimum height=3em, rounded corners]
+\newcommand{\defnodea}[2]{node (p#1) [practicaa]
+	{{\scriptsize\textit{#2}}}}
+
+\tikzstyle{materiab}=[draw, fill=TUMAccentGreen, text width=6.0em, text centered,
+minimum height=1.5em]
+\tikzstyle{practicab} = [materiab, minimum width=5em,
+minimum height=3em, rounded corners]
+\newcommand{\defnodeb}[2]{node (p#1) [practicab]
+	{{\scriptsize\textit{#2}}}}
+
+\tikzstyle{materiac}=[draw, fill=TUMAccentLightBlue, text width=6.0em, text centered,
+minimum height=1.5em]
+\tikzstyle{practicac} = [materiac, minimum width=5em,
+minimum height=3em, rounded corners]
+\newcommand{\defnodec}[2]{node (p#1) [practicac]
+	{{\scriptsize\textit{#2}}}}
+
+\tikzstyle{materiad}=[draw, fill=TUMAccentOrange, text width=6.0em, text centered,
+minimum height=1.5em]
+\tikzstyle{practicad} = [materiad, minimum width=5em,
+minimum height=3em, rounded corners]
+\newcommand{\defnoded}[2]{node (p#1) [practicad]
+	{{\scriptsize\textit{#2}}}}
+
+% Draw background
+\newcommand{\background}[5]{%
+	\begin{pgfonlayer}{background}
+		% Left-top corner of the background rectangle
+		\path (#1.west |- #2.north)+(-0.5,0.5) node (a1) {};
+		% Right-bottom corner of the background rectanle
+		\path (#3.east |- #4.south)+(+0.5,-0.25) node (a2) {};
+		% Draw the background
+		\path[fill=white,rounded corners, draw=black!50, dashed]
+		(a1) rectangle (a2);
+		\path (a1.east |- a1.south)+(0.8,0.2) node (u1)[texto]
+		{\normalsize\textit{#5}};
+\end{pgfonlayer}}
+
 
 
 % Settings for lstlistings

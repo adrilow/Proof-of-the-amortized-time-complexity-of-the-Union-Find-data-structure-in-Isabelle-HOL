@@ -865,7 +865,6 @@ lemma ancestors_of_parent_inclusion:
 definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
                             \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<and>  i\<noteq>j \<longrightarrow> rkl ! i < rkl ! j) 
                             \<comment> \<open>if j is on the path from i to rep_of l i, then rank of j is bigger than rank of i\<close>
-                            \<and> sum (\<lambda>i. if l!i=i then rkl!i else 0) {0..<length l} \<le> length l
                             \<and> (\<forall>i<length l. l!i=i \<longrightarrow> (2::nat) ^ rkl!i \<le> card (descendants l i)) )"
                             \<comment>\<open>rank i \<le> log (card (Domain (ufa_\<alpha> l)))\<close>
 
@@ -1065,6 +1064,11 @@ lemma descendants_subset_domain:
   case (1 y)
     then show ?case unfolding ufa_\<beta>_start_def using converse_rtranclE by force
   qed
+
+lemma finite_descendants:
+  assumes "ufa_invar l" "x < length l"
+  shows "finite (descendants l x)"
+  using subset_eq_atLeast0_lessThan_finite[OF  descendants_subset_domain[OF assms]] .
 
 
 lemma disjoint_descendants:
@@ -1630,6 +1634,111 @@ proof -
     by (auto cong: if_cong)  
 qed
 
+
+lemma path_link_1:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l" "(w,x)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  shows "(w,y)\<in> (ufa_\<beta>_start (ufa_union l x y))\<^sup>*"
+  using assms(6,1-5) proof (induction rule: converse_rtrancl_induct)
+  case base
+  have eq1: "x = rep_of l x" using assms(1,2) rep_of_refl by auto
+  have eq2: "y = rep_of l y" using assms(1,3) rep_of_refl by auto
+  have eq3: "length (l[x:=y]) = length l" by auto
+  show ?case apply (subst eq1[symmetric]) apply (subst eq2[symmetric]) unfolding ufa_\<beta>_start_def 
+    apply (subst eq3)+ using assms(4,5) by (cases "x=y") auto
+next
+  case (step w z)
+  have "w\<noteq>x" "w\<noteq>y" using step(1,5,6) unfolding ufa_\<beta>_start_def by auto
+  with step have "(w,z)\<in> (ufa_\<beta>_start (ufa_union l x y))\<^sup>*" 
+    by (metis (no_types, lifting) case_prodD case_prodI length_list_update mem_Collect_eq 
+        nth_list_update_neq r_into_rtrancl rep_of_simps(1) ufa_\<beta>_start_def)
+  then show ?case using step by fastforce
+qed
+
+lemma path_link_2:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l" "(w,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  shows "(w,z)\<in> (ufa_\<beta>_start (ufa_union l x y))\<^sup>*"
+  using assms (6,1-5) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step v w)
+  have "v\<noteq>x" "v\<noteq>y" using step(1,5,6) unfolding ufa_\<beta>_start_def by auto
+  with step have "(v,w) \<in> (ufa_\<beta>_start (ufa_union l x y))\<^sup>*" 
+    by (metis (no_types, lifting) case_prodD case_prodI length_list_update mem_Collect_eq 
+        nth_list_update_neq rep_of_simps(1) rtrancl.simps ufa_\<beta>_start_def)
+  then show ?case using step by fastforce
+qed
+
+lemma path_link_1_converse:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l" 
+          "(w,y)\<in>(ufa_\<beta>_start (ufa_union l x y))\<^sup>*"
+  shows "(w,x)\<in>(ufa_\<beta>_start l)\<^sup>* \<or> (w,y)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  using assms(6,1-5) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step w z)
+  then show ?case
+    by (smt case_prodD length_list_update mem_Collect_eq nth_list_update_neq rep_of_idx 
+        rep_of_path_iff rep_of_simps(1) ufa_\<beta>_start_def)
+qed
+
+lemma path_link_2_converse:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l" 
+          "(w,z)\<in>(ufa_\<beta>_start (ufa_union l x y))\<^sup>*" "z\<noteq>y"
+  shows "(w,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  using assms(6,1-5,7) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step w v)
+  have "(w,v)\<in>(ufa_\<beta>_start l)\<^sup>*" using step apply (cases "w = rep_of l x")
+    unfolding ufa_\<beta>_start_def
+    apply (smt case_prodD converse_rtranclE' mem_Collect_eq nth_list_update_eq rep_of_refl)
+    unfolding ufa_\<beta>_start_def by auto
+  then show ?case using step by fastforce
+qed
+
+lemma descendants_link_2_incl:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l"
+  shows "descendants l z \<subseteq> descendants (ufa_union l x y) z"
+  unfolding descendants_def using assms(1-5) path_link_2 by blast
+
+lemma card_descendants_link_2_le:
+  assumes "ufa_invar l" "x=l!x" "y=l!y" "x<length l" "y<length l" "z<length l"
+  shows "card (descendants l z) \<le> card (descendants (ufa_union l x y) z)"
+proof -
+  have sg: "z<length (ufa_union l x y)" using assms(6) by fastforce
+  show ?thesis
+    using card_mono[OF finite_descendants[OF ufa_union_invar[OF assms(1,4,5)] sg] 
+                       descendants_link_2_incl[OF assms(1-5), of z]] .
+qed
+
+lemma descendants_link_1:
+  assumes "ufa_invar l"  "x=l!x" "y=l!y" "x<length l" "y<length l"
+  shows "descendants (ufa_union l x y) y = descendants l x \<union> descendants l y"
+  unfolding descendants_def proof (safe, goal_cases)
+  case (1 z)
+  then show ?case using path_link_1_converse[OF assms 1(1)] by blast
+next
+  case (2 z)
+  show ?case using path_link_1[OF assms 2] .
+next
+  case (3 z)
+  show ?case using path_link_2[OF assms 3] .
+qed
+
+lemma descendants_link_2:
+  assumes "ufa_invar l"  "x=l!x" "y=l!y" "x<length l" "y<length l" "z<length l" "z\<noteq>y"
+  shows "descendants (ufa_union l x y) z = descendants l z"
+  unfolding descendants_def proof (safe,goal_cases)
+  case (1 x)
+  show ?case using path_link_2_converse[OF assms(1-5) 1 \<open>z\<noteq>y\<close>] .
+next
+  case (2 x)
+  show ?case using path_link_2[OF assms(1-5) 2] .
+qed
+
 lemma invar_rank_link:
   assumes "invar_rank l rkl" "x < length l" "y < length l" "x=l!x" "y=l!y" "x\<noteq>y"
   shows "invar_rank (union_by_rank_l l rkl x y) (union_by_rank_rkl rkl x y)"
@@ -1647,21 +1756,59 @@ next
     by (smt Suc_lessD Suc_less_eq Suc_n_not_le_n le_eq_less_or_eq length_list_update 
         not_le_imp_less nth_list_update_eq nth_list_update_neq order_less_irrefl rep_of_iff)
 next
-  case 4
-  then show ?case unfolding union_by_rank_l_def union_by_rank_rkl_def invar_rank_def 
-  proof (auto cong: if_cong, goal_cases)
-    case 1
-    then show ?case sorry
+  case (4 i)
+  have "i<length l" using 4 unfolding union_by_rank_l_def by (cases "rkl!x<rkl!y") auto
+  have eq: "rkl[i := Suc (rkl ! y)] ! i = Suc (rkl!y)" 
+    using \<open>i < length l\<close> assms(1) invar_rank_def by force
+  show ?case  unfolding union_by_rank_rkl_def union_by_rank_l_def
+    apply (cases "rkl!x=rkl!y") proof goal_cases
+    case 1 \<comment>\<open>True\<close>
+    have "i=l!i" using 1 assms 4 unfolding union_by_rank_l_def apply (auto cong: if_cong)
+      by (metis nth_list_update_neq rep_of_refl)
+    have hdi: "2^rkl!i \<le> card (descendants l i)" using assms(1) \<open>i<length l\<close> \<open>i=l!i\<close> 
+      unfolding invar_rank_def by presburger
+    have hdy: "2^rkl!y \<le> card (descendants l y)" using assms(1) \<open>y<length l\<close> \<open>y=l!y\<close> 
+      unfolding invar_rank_def by presburger
+    then show ?case proof (cases "i=x")
+      case True
+      have "y\<noteq>i" using True 1 4 by argo
+      show ?thesis using True[symmetric] 1 apply (auto cong: if_cong) 
+        apply (subst descendants_link_1[OF invar_rank_ufa_invarI[OF 4(1)] 
+              4(5) \<open>i=l!i\<close> \<open>y<length l\<close> \<open>i<length l\<close>])
+        apply (subst card_Un_disjoint[OF 
+              finite_descendants[OF  invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] \<open>y<length l\<close>]
+              finite_descendants[OF  invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] \<open>i<length l\<close>]
+              disjoint_descendants[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] 
+                \<open>y<length l\<close> \<open>i<length l\<close> \<open>y=l!y\<close> \<open>i=l!i\<close> \<open>y\<noteq>i\<close>]])
+        apply (subst eq)
+        using hdi hdy by simp 
+    next
+      case False
+      then show ?thesis using 1 4 apply (auto cong: if_cong)
+        apply (subst descendants_link_2[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] 
+              \<open>y=l!y\<close> \<open>x=l!x\<close> \<open>y<length l\<close> \<open>x<length l\<close> \<open>i<length l\<close> \<open>i\<noteq>x\<close>])
+        unfolding invar_rank_def using \<open>i=l!i\<close> \<open>i<length l\<close> by presburger
+    qed
   next
-    case 2
-    then show ?case sorry
-  next
-    case 3
-    then show ?case sorry
+    case 2 \<comment>\<open>False\<close>
+    have "i=l!i" using 2 assms 4 apply (auto cong: if_cong)
+      by (smt nth_list_update_neq rep_of_refl union_by_rank_l_def)
+      then show ?case proof (cases "rkl!x < rkl!y")
+      case True
+      then show ?thesis using 2 4 apply (auto cong: if_cong) 
+        apply (rule order.trans[where b = "card (descendants l i)"])
+        using \<open>i=l!i\<close> \<open>i<length l\<close> unfolding invar_rank_def apply presburger
+        using card_descendants_link_2_le[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] 
+            \<open>x=l!x\<close> \<open>y=l!y\<close> \<open>x<length l\<close> \<open>y<length l\<close> \<open>i<length l\<close>] by blast
+    next
+      case False
+      then show ?thesis using 2 4 apply (auto cong: if_cong) 
+        apply (rule order.trans[where b = "card (descendants l i)"])
+        using \<open>i=l!i\<close> \<open>i<length l\<close> unfolding invar_rank_def apply presburger
+        using card_descendants_link_2_le[OF invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] 
+            \<open>y=l!y\<close> \<open>x=l!x\<close> \<open>y<length l\<close> \<open>x<length l\<close> \<open>i<length l\<close>] by blast
+    qed
   qed
-next
-  case (5 i)
-  then show ?case sorry
 qed
 
 \<comment>\<open>The proof is awful, please don't look at it\<close>
@@ -1682,13 +1829,9 @@ next
         nth_list_update' parent_has_greater_rank rank_increases_strictly_along_path 
         rep_of_iff rep_of_ufa_\<beta>)
 next
-  case 4
-  then show ?case unfolding invar_rank_def  unfolding ufa_\<beta>_start_def apply auto
-    by (smt case_prodD mem_Collect_eq nth_list_update_eq nth_list_update_neq rep_of_path_iff sum_ivl_cong)
-next
-  case (5 i)
-  have xidom: "i<length l" "x<length l" "y<length l" using 5 unfolding ufa_\<beta>_start_def by auto
-  have deq: "descendants l i = descendants (l[x := rep_of l y]) i" using 5 unfolding descendants_def
+  case (4 i)
+  have xidom: "i<length l" "x<length l" "y<length l" using 4 unfolding ufa_\<beta>_start_def by auto
+  have deq: "descendants l i = descendants (l[x := rep_of l y]) i" using 4 unfolding descendants_def
   proof(safe, goal_cases)
     case (1 x')
     show ?case using 1(5,1-4) 
@@ -1696,13 +1839,13 @@ next
       case True
       then show ?thesis using compress_preserves_paths_to_roots[OF \<open>(x, y) \<in> ufa_\<beta>_start l\<close> 
            invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] _ \<open>(x', i) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> ]
-        by (smt "5"(4) assms(1,2) case_prodD invar_rank_ufa_invarI mem_Collect_eq nth_list_update' 
+        by (smt "4"(4) assms(1,2) case_prodD invar_rank_ufa_invarI mem_Collect_eq nth_list_update' 
             rep_of_idx rep_of_ufa_\<beta>_refl rtrancl.rtrancl_refl ufa_\<beta>_start_def)
     next
       case False
       then show ?thesis using compress_preserves_paths_to_roots[OF \<open>(x, y) \<in> ufa_\<beta>_start l\<close> 
            invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] _ \<open>(x', i) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> ]
-        by (smt "5"(4) assms(1) assms(2) case_prodD invar_rank_ufa_invarI mem_Collect_eq 
+        by (smt "4"(4) assms(1) assms(2) case_prodD invar_rank_ufa_invarI mem_Collect_eq 
             nth_list_update' nth_list_update_eq rep_of_idx rep_of_min rep_of_ufa_\<beta>_refl 
             ufa_\<beta>_start_def xidom(1,2))
     qed 
@@ -1720,13 +1863,13 @@ next
       with 2(5) 2(1-3) False show ?thesis using 
           compress_preserves_rep_of_direct[OF 2(2) invar_rank_ufa_invarI[OF 2(1)] _]
         apply (induction rule: converse_rtrancl_induct) by blast
-          (smt "5"(4) Pair_inject case_prodD converse_rtrancl_into_rtrancl invar_rank_ufa_invarI 
+          (smt "4"(4) Pair_inject case_prodD converse_rtrancl_into_rtrancl invar_rank_ufa_invarI 
             length_list_update mem_Collect_eq rep_of_bound rep_of_idx rep_of_invar_along_path  
             rep_of_refl rep_of_ufa_\<beta>_refl ufa_\<beta>_start_def ufa_compress_aux(2) ufa_compress_invar xidom(1,2))
     qed 
   qed
-  have "i<length l" using 5 by fastforce
-  thus ?case apply (subst deq[symmetric]) using 5 deq unfolding invar_rank_def
+  have "i<length l" using 4 by fastforce
+  thus ?case apply (subst deq[symmetric]) using 4 deq unfolding invar_rank_def
     by (metis nth_list_update rep_of_min xidom(2) xidom(3))
 qed
 
@@ -2464,12 +2607,12 @@ proof -
     have "ufa_invar (l[x := z])" using assms(1) unfolding ufa_invar_def
     proof (safe, goal_cases)
       case (1 i)                       
-      then show ?case using rep_of.domintros
+      then show ?case using rep_of.domintros sorry
     next
       case (2 i)
       then show ?case sorry
     qed
-    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>]
+    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>] sorry
   qed
 qed
 
@@ -2493,7 +2636,7 @@ next
   using rep_of_idx step.hyps(1) step.prems(2) ufa_compress_invar unfolding ufa_\<beta>_start_def by force
   show ?case apply (rule FWIPCStep[of y z' "l[x:=z]" i "l'[x:=z]"])
     defer
-    using step(3) compress_preserves_rep_of_weak[OF step(4)] sorry
+    using step(3) compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> _ _ _ step(4)] sorry
 qed
 
 notation Ref.update ("_ := _" 62)
@@ -2788,18 +2931,6 @@ proof -
   show ?thesis using bounded_displeasure_preliminary_1[OF path assms] bounded_levels[OF assms]
     by simp
 qed
-
-
-\<comment>\<open> As an ad hoc corollary, if every non-root non-OK vertex has an OK parent,
-   then we obtain the following bound. This is useful in the special case
-   where OK is defined as "non-zero-rank". \<close>
-    
-
-lemma bounded_displeasure:
-  \<comment>\<open>TODO: rewrite this in a sensible way\<close>
-  assumes "\<forall>x y. l!x\<noteq>x \<longrightarrow> \<not>ok l rkl x \<longrightarrow> (x,y)\<in> (ufa_\<beta>_start l) \<longrightarrow> ok l rkl y" 
-  shows "displeasure x \<le> Suc bound"
-  sorry
 
 end \<comment>\<open>Until here the assumtions about ok and level\<close>
 
@@ -3316,24 +3447,6 @@ qed
 end \<comment>\<open>invar_rank\<close>
 
 
-
-
-lemma invar_rank_sli_le_l:
-  assumes "invar_rank l rkl" "ufa_invar l" "i<length l"
-  shows "rkl ! (rep_of l i) \<le> length l"
-proof -
-  from assms(1) have a: "sum (\<lambda>i. if l!i=i then rkl !i else 0) {0..<length l} \<le> length l"
-      and len: "length rkl = length l" by(auto simp: invar_rank_def)
-  let ?r = "(rep_of l i)"
-  from assms have "?r<length l" by(auto simp: rep_of_bound)    
-  then have f: "{0..<length l} = {?r} \<union> ({0..<length l}-{?r})" by auto
-  have "rkl ! (?r) \<le> sum (\<lambda>i. if l!i=i then rkl !i else 0) ({0..<length l}-{?r}) + (if l!?r=?r then rkl !?r else 0)"
-    using assms by (auto simp: rep_of_min) 
-  also have "\<dots> = sum (\<lambda>i. if l!i=i then rkl !i else 0) {0..<length l}"
-    apply(subst (2) f) apply(subst sum_Un_nat) by simp_all
-  also have "\<dots> \<le> length l" using a by simp
-  finally show "rkl ! (rep_of l i) \<le> length l" .
-qed
 
 
 lemma amortized_cost_compress:
