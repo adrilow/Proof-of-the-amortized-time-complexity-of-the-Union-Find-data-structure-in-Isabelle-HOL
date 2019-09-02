@@ -780,6 +780,7 @@ proof (rule ccontr)
   thus "False" using aciclicity assms by fast
 qed
 
+
 \<comment>\<open>If there is an edge from i to j, then i and j must be distinct.\<close>
 
 lemma edges_have_distinct_endpoints:
@@ -1051,6 +1052,17 @@ qed
 
 
 
+no_notation Ref.update ("_ := _" 62)
+  
+
+lemma ufa_compress_generalized:
+  assumes I: "ufa_invar l"
+  assumes L[simp]: "x<length l" "z<length l"
+  shows "ufa_invar (l[x := z])" 
+  sorry
+notation Ref.update ("_ := _" 62)
+
+
 lemma descendant_of_root:
   assumes "ufa_invar l" "r<length l"  "x<length l" "r=l!r" 
   shows "x \<in> descendants l r \<longleftrightarrow> r = rep_of l x"
@@ -1218,7 +1230,6 @@ section{*Level: Definition and Lemmas*}
 
 context \<comment>\<open>NonRoot\<close>
   fixes l::"nat list" and rkl::"nat list" and i::nat
-  assumes contextasm: "invar_rank l rkl" "i<length l" "l!i\<noteq>i"
 begin
 
 definition defk where "defk k \<equiv> Ackermann k (rankr rkl i)"
@@ -1240,6 +1251,11 @@ definition level' where "level' l' rkl' i' \<equiv> Suc (Greatest (\<lambda>k. r
 
 lemma level_alt_eq: "level = level' l rkl i" 
   unfolding level_def level'_def prek_def lnn.\<beta>\<^sub>f_def defk_def by blast
+
+
+context \<comment>\<open>NonRoot\<close>
+  assumes contextasm: "invar_rank l rkl" "i<length l" "l!i\<noteq>i"
+begin
 
 
 \<comment>\<open>The following lemma proves that @{term level} is well-defined.\<close>
@@ -1353,6 +1369,7 @@ lemma index_le_rank: "index \<le> rankr rkl i"
   unfolding level_def apply (subst Ackermann_step_eq) by simp
   done
 
+end
 end
 
 
@@ -1520,20 +1537,68 @@ qed
 
 section {*Lemmas about paths and inavriants under compression (UnionFind04Compress)*}
 
-context 
-  fixes x::nat and y::nat and l::"nat list"
-  assumes x_edge_y: "(x,y)\<in> (ufa_\<beta>_start l)"
-begin \<comment>\<open>x_edge_y\<close>
-
+no_notation Ref.update ("_ := _" 62)
 lemma compress_preserves_other_edges:
   assumes "(v,w)\<in> (ufa_\<beta>_start l)" "v\<noteq>x"
-  shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= rep_of l x]))"
+  shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))"
+  using assms unfolding ufa_\<beta>_start_def by auto
+
+lemma compress_preserves_other_edges_converse:
+  assumes "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))" "v\<noteq>x"
+  shows "(v,w)\<in> (ufa_\<beta>_start l)"
   using assms unfolding ufa_\<beta>_start_def by auto
 
 lemma compress_preserves_roots:
   assumes "r = l!r"
   shows "r = l[x:=rep_of l x] ! r"
   using assms apply (cases "r = x") apply auto using rep_of_refl list_update_id by metis
+notation Ref.update ("_ := _" 62)
+
+context 
+  fixes x::nat and y::nat and l::"nat list"
+  assumes x_edge_y: "(x,y)\<in> (ufa_\<beta>_start l)"
+begin \<comment>\<open>x_edge_y\<close>
+
+
+lemma compress_preserves_paths_out_of_y':
+  assumes "ufa_invar l" "(v,w)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y,v)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y, z) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))\<^sup>*"
+  using assms(2,3)  x_edge_y proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step y0 z)
+  have "y0\<noteq>x" using paths_have_distinct_endpoints using step 
+    by (metis (no_types, lifting) aciclicity assms(1) mem_Collect_eq prod.simps(2) 
+        rtrancl_into_trancl2 ufa_\<beta>_def ufa_\<beta>_start_def)
+  hence sg1: "(y0, z) \<in> ufa_\<beta>_start (l[x := z])" 
+    using step compress_preserves_other_edges by blast
+  have "(y, z) \<in> (ufa_\<beta>_start l)\<^sup>*" using step by auto
+  then show ?case using step sg1 
+    by (meson \<open>y0 \<noteq> x\<close> compress_preserves_other_edges converse_rtrancl_into_rtrancl)
+qed
+
+lemma compress_preserves_rep_of_direct':
+  assumes "ufa_invar l" "r = rep_of l x" "(y,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  shows "r = rep_of (l[x := z]) x"
+  using x_edge_y \<open>ufa_invar l\<close> assms(2)
+proof -
+  have sg1: "rep_of l x = rep_of l y" using x_edge_y \<open>ufa_invar l\<close> 
+    using rep_of_idx ufa_\<beta>_start_def by auto
+  have sg2: "rep_of l y = rep_of l z" using assms(3) 
+    by (metis (no_types, lifting) sg1 assms(2) case_prodD assms(1) mem_Collect_eq 
+        rep_of_bound rep_of_invar_along_path rtrancl.simps ufa_\<beta>_start_def x_edge_y)
+  have sg3: "rep_of (l[x := z]) x = rep_of (l[x := z]) z" 
+    by (metis (no_types, lifting) assms(3) case_prodD assms(1) length_list_update mem_Collect_eq 
+        nth_list_update_eq rep_of_idx rtrancl.simps ufa_\<beta>_start_def ufa_compress_generalized x_edge_y)
+  have sg4: "rep_of (l[x := z]) z = rep_of l z" 
+    apply (cases "x = z")
+    subgoal using x_edge_y assms(3) 
+      by (metis aciclicity assms(1) list_update_beyond not_le_imp_less rtrancl_into_trancl2 ufa_\<beta>_def) 
+    sorry
+  thus ?thesis using sg1 sg2 sg3 sg4 assms by argo
+qed
+
 
 context
   assumes inv: "ufa_invar l" and
@@ -1592,6 +1657,9 @@ next
     then show ?thesis  using step by fastforce
   qed
 qed
+
+
+
 
 
 lemma compress_preserves_rep_of_direct:
@@ -1981,6 +2049,28 @@ section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
 \<comment>\<open>This would be compress_preserves_k_above_y, again this does not apply as we compress differently\<close>
 
 
+lemma compress_preserves_level_above_y:
+  assumes "invar_rank l rkl" "(x,y)\<in>(ufa_\<beta>_start l)" 
+          "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*"  "(y,v)\<in> (ufa_\<beta>_start l)\<^sup>*" "v\<noteq>l!v"
+        shows "level (l[x:=z]) rkl v = level l rkl v"
+proof -
+  have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  have "y<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  hence "v<length l" using assms(4) unfolding ufa_\<beta>_start_def using rtranclE by force
+  hence "v<length (l[x:=z])" by auto
+  have "l[x := z] ! v \<noteq> v" using assms 
+    by (metis \<open>v < length (l[x := z])\<close> aciclicity invar_rank_ufa_invarI length_list_update 
+        nth_list_update_neq rtrancl_into_trancl2 ufa_\<beta>_def)
+  have "x\<noteq>v" 
+    using paths_have_distinct_endpoints
+          [OF invar_rank_ufa_invarI[OF assms(1)] \<open>x<length l\<close> \<open>v<length l\<close>] assms 
+    by (metis trancl.intros(1) trancl_rtrancl_trancl ufa_\<beta>_def)
+  hence eq: "(l[x := z] ! v) = l!v" by simp
+  show ?thesis unfolding level_def prek_def by (subst eq) (rule refl)
+qed
+
+
+
 \<comment>\<open> Assume x and y are non-roots. (This is required for their level and index
    to be defined.) Assume that there is a non-trivial path from x to y.
    Finally, assume that x and y have the same level, i.e., @{term "level l rkl x = level l rkl y"}.
@@ -1988,7 +2078,8 @@ section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
    This is part of the proof of Lemma 4.10 in Alstrup et al.'s paper. \<close>
 
 lemma levelx_levely:
-  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" "level l rkl x = level l rkl y"
+  assumes "invar_rank l rkl" "x<length l" "y<length l" "x\<noteq>l!x" "y\<noteq>l!y" "(l!x,y) \<in> (ufa_\<beta>_start l)\<^sup>*" 
+          "level l rkl x = level l rkl y"
   shows "compow (Suc (index l rkl x)) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!y)"
 proof -
   have pp: "prek l rkl x = prek l rkl y" using level_def assms by simp
@@ -2002,19 +2093,18 @@ proof -
      @{term "rankr rkl (l!x)"}. \<close>
   have hx: "compow (index l rkl x) (Ackermann (prek l rkl x)) (rankr rkl x) \<le> rankr rkl (l!x)"
     unfolding index_def[OF assms(1,2) assms(4)[symmetric]] 
-    apply (rule f_nat_nat.f_\<beta>\<^sub>f[OF inn_f_nat_nat, OF assms(1) assms(2) assms(4)[symmetric], of "rankr rkl (l ! x)"])
+    apply (rule f_nat_nat.f_\<beta>\<^sub>f[OF inn_f_nat_nat, OF assms(1) assms(2) assms(4)[symmetric], 
+                              of "rankr rkl (l ! x)"])
     apply simp
     using assms(1,2) parent_has_greater_rankr by fastforce
       (* By definition of [prek], applying [A (prek x)] to [rankr y] takes us
      at least to [rankr (p y)]. *)
-  have hy': "Ackermann 0 (rankr rkl y) \<le> rankr rkl (l ! y)" apply (subst Ackermann_base_eq) unfolding rankr_def 
+  have hy': "Ackermann 0 (rankr rkl y) \<le> rankr rkl (l ! y)" 
+    apply (subst Ackermann_base_eq) unfolding rankr_def 
     using assms(1,3,5) parent_has_greater_rank by fastforce
   have hy: "Ackermann (prek l rkl x) (rankr rkl y) \<le> rankr rkl (l!y)"
     apply (subst pp)
-    using f_nat_nat.\<beta>\<^sub>f_spec_direct[OF lnn_f_nat_nat, OF assms(1) assms(3) assms(5)[symmetric],
-        of "rankr rkl (l ! y)" "(prek l rkl y)"] 
-    unfolding prek_def[OF assms(1) assms(3) assms(5)[symmetric]] 
-      defk_def[OF assms(1) assms(3) assms(5)[symmetric]] using hy' by fast
+    using f_nat_nat.\<beta>\<^sub>f_spec_direct[OF lnn_f_nat_nat ] unfolding prek_def defk_def using hy' by fast
   have sg1: "Ackermann (prek l rkl x) (rankr rkl y)  \<le> rankr rkl (l ! y)" using hy by simp
   have sg0: "Ackermann (prek l rkl x) (rankr rkl (l ! x))  \<le> rankr rkl (l ! y)" using hxy sg1
       mono_Ackermann[of "prek l rkl x"] unfolding mono_def by fastforce
@@ -2043,9 +2133,8 @@ proof -
     using rpyz f by linarith
   have sg0: "x < length (l[x := rep_of l x])" using assms(2) by simp
   have prehkk: "prek l rkl x = prek (l[x:= rep_of l x]) rkl x" 
-    using assms(9) level_def[OF assms(1,2) assms(4)[symmetric]] 
-      level_def[OF invar_rank_evolution[OF assms(1) compress_evolution[OF assms(1,2,4)]] 
-        sg0 non_root_forever[OF assms(1) compress_evolution[OF assms(1,2,4)] assms(4), symmetric]]
+    using assms(9) level_def  
+        sg0 non_root_forever[OF assms(1) compress_evolution[OF assms(1,2,4)] assms(4), symmetric]
     by auto
   have f': "(Ackermann (prek (l[x := rep_of l x]) rkl x) ^^ Suc (index l rkl x)) (rankr rkl x)
     \<le> rankr rkl z" using rpyz' apply (subst (asm) prehkk) .
@@ -2177,15 +2266,11 @@ lemma rankr_parent_grows:
   @{term "level l rkl v"} can only grow\<close>
 
 lemma defk_f_nat_nat: "f_nat_nat (\<lambda>k. Ackermann k (rankr rkl v))" 
-  using lnn_f_nat_nat[OF contextasm(1) vinDom v_has_a_parent[symmetric]]  
-  unfolding defk_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]]
-  . 
+  using lnn_f_nat_nat unfolding defk_def . 
 
 lemma level_v_grows:
   "level l rkl v \<le> level l' rkl' v"
-  unfolding level_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]]  level_def[OF evoasms]
-    prek_def[OF contextasm(1)  vinDom v_has_a_parent[symmetric]] prek_def[OF evoasms]
-    defk_def[OF contextasm(1)  vinDom v_has_a_parent[symmetric]] defk_def[OF evoasms]
+  unfolding level_def prek_def defk_def
   apply (subst Suc_le_mono)
   apply (subst non_root_has_constant_rankr[symmetric])
   using rankr_parent_grows f_nat_nat.\<beta>\<^sub>f_mono[OF defk_f_nat_nat] 
@@ -2200,8 +2285,7 @@ lemma index_v_grows_if_level_v_constant:
   shows "index l rkl v \<le> index l' rkl' v"
 proof -
   have h': "prek l rkl v = prek l' rkl' v" using assms 
-    unfolding level_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]] level_def[OF evoasms] 
-    by blast
+    unfolding level_def by blast
   show ?thesis 
     unfolding index_def[OF contextasm(1) vinDom v_has_a_parent[symmetric]] index_def[OF evoasms]
     apply (subst h'[symmetric])
@@ -2373,8 +2457,7 @@ next
   have hpx: " ufa_union l x y ! x = y" 
     using ufa_union_sets_parent[OF invar_rank_ufa_invarI[OF assms(1)] assms(3,4,5)] assms(4,6) 
           rep_of_refl by simp
-  have hkx: "1 \<le> level (ufa_union l x y) rkl' x" using level_def[OF h8, of x] leq assms(2,3) hpx 
-    by linarith
+  have hkx: "1 \<le> level (ufa_union l x y) rkl' x" using level_def leq assms(2,3) hpx by simp
   have hix: "1 \<le> index (ufa_union l x y) rkl' x" using index_ge_1[OF h8, of x] leq assms(2,3) hpx
     by presburger
 
@@ -2550,37 +2633,6 @@ lemma compress_preserves_roots_other_than_x:
   shows "r=l[x:=z]!r"
   using assms by simp
 
-
-(*
-lemma fw_ipc_compress_preliminary:
-  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
-  shows "fw_ipc (l[x := rep_of l x]) y i (l'[x := rep_of l x])"
-  using assms proof (induction l y i l' rule: fw_ipc.induct)
-  case base: (FWIPCBase x' l)
-  have "x'\<noteq>x" using base(2) by fast
-  show ?case using FWIPCBase[OF compress_preserves_roots_other_than_x[OF \<open>x'\<noteq>x\<close> base(1)]] .
-next
-  case step: (FWIPCStep x' y l i l')
-  have sg0': "rep_of l y =  rep_of l x'" using step(1) rep_of_path_iff[OF \<open>ufa_invar l\<close>]
-    using rep_of_idx step.prems(2) ufa_\<beta>_start_def by auto
-  have sg0: "(y, x) \<notin> (ufa_\<beta>_start (l[x' := rep_of l y]))\<^sup>*"  apply (subst sg0') using step(4,1) 
-    sorry
-  hence sg0c: "(x', x) \<notin> (ufa_\<beta>_start (l[x' := rep_of l y]))\<^sup>*" using step(1,4) sorry
-  have sg1: "(x', y) \<in> ufa_\<beta>_start (l[x := rep_of l x])" using step 
-    by (metis (no_types, lifting) length_list_update mem_Collect_eq nth_list_update_neq 
-        prod.simps(2) rtrancl.simps ufa_\<beta>_start_def)
-  have sg2: "ufa_invar (l[x' := rep_of l y])" apply (subst sg0') 
-    using ufa_compress_invar[OF \<open>ufa_invar l\<close>] step(1) unfolding ufa_\<beta>_start_def by blast
-  have sg3': "rep_of (l[x' := rep_of l y]) x = rep_of l x" apply (subst sg0') 
-    using step(4) sg0c apply (subst (asm) sg0') sorry
-  have sg3'': "rep_of (l[x := rep_of l x]) y = rep_of l y" using step sorry
-  have sg3: "fw_ipc (l[x := rep_of l x, x' := rep_of (l[x := rep_of l x]) y]) y i (l'[x := rep_of l x])"
-    using step(3)[OF sg0 sg2] apply (subst (asm) sg3') apply (subst (asm) sg3') apply (subst sg3'') 
-    by (metis list_update_swap sg0')
-  show ?case using FWIPCStep[OF sg1 sg3] .
-qed
-*)
-
 lemma compress_preserves_paths_converse:
   assumes "(x,y)\<in>(ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" 
           "(u,w)\<in> (ufa_\<beta>_start (l[x:=z]))\<^sup>*"
@@ -2593,6 +2645,70 @@ lemma compress_preserves_paths_converse:
         rtrancl.rtrancl_into_rtrancl rtrancl.rtrancl_refl rtrancl_trans ufa_\<beta>_start_def)
 qed blast
 
+lemma compress_preserves_paths_weak:
+  assumes "(y,r)\<in> (ufa_\<beta>_start l)\<^sup>*" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
+  shows "(y,r)\<in>(ufa_\<beta>_start (l[x:=z]))\<^sup>*"
+  using assms proof induction
+  case base
+  then show ?case by blast
+next
+  case (step y z)
+  show ?case apply rule 
+    using  step(3)[OF step(4)] apply blast
+    using step using compress_preserves_other_edges by fast
+qed
+
+lemma compress_preserves_paths_weak_converse:
+  assumes "(y,r)\<in>(ufa_\<beta>_start (l[x:=z]))\<^sup>*" "(y,x)\<notin>(ufa_\<beta>_start l)\<^sup>*"
+  shows "(y,r)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  using assms proof induction
+  case base
+  then show ?case by blast
+next
+  case (step z0 z1)
+  hence "z0\<noteq>x" by blast
+  then show ?case using compress_preserves_other_edges_converse[OF step(2) \<open>z0\<noteq>x\<close>] step 
+    by fastforce
+qed
+
+
+lemma compress_changes_parent_of_x_to_z:
+  assumes "x<length l"  
+  shows "(l[x:= rep_of l x])!x = rep_of l x"
+  using assms by auto
+
+lemma compress_preserves_roots_converse:
+  assumes "ufa_invar l" "r = (l[x:= rep_of l x])!r"
+  shows "r = l!r"
+  using assms
+  by (metis \<open>ufa_invar l\<close>  nth_list_update_neq nth_update_invalid
+      rep_of_min rep_of_refl ufa_compress_aux(2))
+
+lemma compress_preserves_roots_converse':
+  assumes "r = (l[x:=z])!r"  "r\<noteq>x"
+  shows "r = l!r"
+  using assms by simp
+
+
+
+lemma compress_preserves_rep_of_weak_converse:
+  assumes "ufa_invar l"  "(y,x)\<notin>(ufa_\<beta>_start l)\<^sup>*" "x<length l" "y<length l" "z<length l"
+  shows "rep_of (l[x:=z]) y = rep_of l y"
+proof -
+  have path: "(y, rep_of l y) \<in> (ufa_\<beta>_start l)\<^sup>* " "l ! rep_of l y = rep_of l y" 
+    using rep_of_path_iff[OF assms(1) rep_of_bound[OF assms(1,4)] assms(4)] by auto
+
+  have pathcom: "(y, rep_of l y) \<in> (ufa_\<beta>_start (l[x:=z]))\<^sup>* " 
+    using compress_preserves_paths_weak[OF path(1) assms(2)] .
+  have rootcom: "l[x:=z] ! (rep_of l y) = rep_of l y" 
+    using path(2) assms(2,4)  unfolding ufa_\<beta>_start_def 
+    by (metis assms(2) compress_preserves_roots_other_than_x path(1))
+
+  show ?thesis using rep_of_path_iff assms pathcom rootcom path ufa_compress_generalized 
+      rep_of_bound  by force    
+qed
+  
+
 lemma compress_preserves_rep_of_weak:
   assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
   shows "rep_of (l[x:=z]) y = rep_of l y"
@@ -2603,21 +2719,14 @@ proof -
     then show ?case using rep_of_refl by auto
   next
     case (step i)
-    have " rep_of (l[x := z]) (l ! i) = rep_of l (l ! i)" sorry
-    have "ufa_invar (l[x := z])" using assms(1) unfolding ufa_invar_def
-    proof (safe, goal_cases)
-      case (1 i)                       
-      then show ?case using rep_of.domintros sorry
-    next
-      case (2 i)
-      then show ?case sorry
-    qed
-    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>] sorry
+    have "ufa_invar (l[x := z])" using ufa_compress_generalized[OF assms(1,2,4)] .
+    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>] 
+      using compress_preserves_rep_of_weak_converse step by blast
   qed
 qed
 
 lemma fw_ipc_compress_preliminary:
-  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l"
+  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l" "x<length l" "z<length l"
   shows "fw_ipc (l[x := z]) y i (l'[x := z])"
   using assms proof (induction l y i l' rule: fw_ipc.induct)
   case base: (FWIPCBase y0 l)
@@ -2626,17 +2735,29 @@ lemma fw_ipc_compress_preliminary:
     using base.prems(1) by blast
 next
   case step: (FWIPCStep y z' l i l')
-  have sg1: "(z', rep_of l z') \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_path_iff[OF \<open>ufa_invar l\<close>, of z'] 
-      step(1) rep_of_bound[OF \<open>ufa_invar l\<close>, of z'] unfolding ufa_\<beta>_start_def sorry
+  have sg1': "z'<length l" using step unfolding ufa_\<beta>_start_def by blast
+  have sg1: "(z', rep_of l z') \<in> (ufa_\<beta>_start l)\<^sup>*" using 
+      rep_of_path_iff[OF \<open>ufa_invar l\<close> rep_of_bound[OF \<open>ufa_invar l\<close> \<open>z'<length l\<close>] \<open>z'<length l\<close>] 
+    by blast
+  have sg2: "(y, z') \<in> ufa_\<beta>_start (l[x:=z])" using step 
+    by (metis compress_preserves_other_edges rtrancl.simps)
+  have sg3': "z'<length l" using step(1) unfolding ufa_\<beta>_start_def by blast
+  have sg3'': "(z', x) \<notin> (ufa_\<beta>_start l)\<^sup>*" using step(1,4) 
+    by (meson converse_rtrancl_into_rtrancl)
+  have sg3: "rep_of (l[x := z]) z' = rep_of l z' " using 
+      compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>  sg3' \<open>z<length l\<close> sg3''] .
   have IHfw_ipc: "fw_ipc (l[y := rep_of l z', x := z]) z' i (l'[x := z])" 
     apply (rule step(3))
     subgoal apply (rule ccontr)
     using compress_preserves_paths_converse[OF step(1) sg1, of z' x] step(4)
     by (meson converse_rtrancl_into_rtrancl step.hyps(1))
-  using rep_of_idx step.hyps(1) step.prems(2) ufa_compress_invar unfolding ufa_\<beta>_start_def by force
-  show ?case apply (rule FWIPCStep[of y z' "l[x:=z]" i "l'[x:=z]"])
-    defer
-    using step(3) compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> _ _ _ step(4)] sorry
+  using rep_of_idx step assms ufa_compress_invar unfolding ufa_\<beta>_start_def by auto
+  show ?case 
+    apply (rule FWIPCStep)
+     apply (rule sg2)
+    apply (subst sg3)
+    using IHfw_ipc 
+    by (metis list_update_swap rtrancl.simps step.prems(1))
 qed
 
 notation Ref.update ("_ := _" 62)
@@ -2646,7 +2767,8 @@ lemma fw_ipc_compress:
   shows "fw_ipc (l[x := rep_of l y]) y i (l'[x := rep_of l y])"
   apply (rule fw_ipc_compress_preliminary[OF assms(3) _ assms(1), of x "rep_of l y"])
   using assms(2) aciclicity[OF assms(1)] unfolding ufa_\<beta>_def ufa_\<beta>_start_def
-  by (metis (no_types, lifting) mem_Collect_eq old.prod.case rtrancl_into_trancl1)
+    apply (metis (no_types, lifting) mem_Collect_eq old.prod.case rtrancl_into_trancl1)
+  using assms(1,2) rep_of_bound unfolding ufa_\<beta>_start_def by auto
 
 lemma bw_ipc_fw_ipc:
   assumes "ufa_invar l" "bw_ipc l x i l'" 
@@ -2664,14 +2786,73 @@ next
       fw_ipc_compress[OF step(4) step(1) step(3)[OF step(4)]] sg1 by argo
 qed
 
+no_notation Ref.update ("_ := _" 62)
+
+lemma bw_ipc_compress_preliminary:
+  assumes "ufa_invar l" "bw_ipc lxz y i lxz'"  "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "lxz = (l[x:=z])" 
+          "x<length l" "z<length l"
+  shows "\<exists>l'. lxz' = l'[x:=z] \<and> bw_ipc l y i l'"
+  using assms(2,1,3,4) proof (induction)
+  case base: (BWIPCBase x l')
+  show ?case apply (rule exI[where x = l]) using base BWIPCBase
+    by (metis nth_list_update_neq rtrancl.simps)
+next
+  case step: (BWIPCStep x0 y0 l' i l'')
+  have h2: "x\<noteq>x0" using step(5) by blast
+  hence h3: "(x0, y0) \<in> ufa_\<beta>_start l'" using compress_preserves_other_edges_converse step by fast
+  have sg: "\<exists>l'. l'' = l'[x := z] \<and> bw_ipc l y0 i l'" 
+    apply (rule step(3)[OF assms(1) _ \<open>l'=l[x:=z]\<close>]) using compress_preserves_paths_converse step 
+    by (metis (no_types, lifting) converse_rtrancl_into_rtrancl h2 length_list_update 
+        mem_Collect_eq nth_list_update_neq prod.simps(2) ufa_\<beta>_start_def)
+  obtain l'0 where IH': "l'' = l'0[x := z]" "bw_ipc l y0 i l'0" using sg by blast
+  have "x0<length l" using h3 unfolding ufa_\<beta>_start_def step by auto
+  have sg1: "rep_of l' x0 = rep_of l x0" apply (subst \<open>l' = l[x := z]\<close>) 
+    using compress_preserves_rep_of_weak_converse
+          [OF assms(1) step(5) \<open>x<length l\<close> \<open>x0<length l\<close> \<open>z<length l\<close>] .
+  have sg2': "(x0, y0) \<in> (ufa_\<beta>_start (l[x := z]))\<^sup>*" using step by blast
+  have sg2: "(x0, y0) \<in> (ufa_\<beta>_start l)" using step 
+          compress_preserves_other_edges_converse by blast
+  show ?case                                           
+    apply (subst IH'(1))
+    apply (rule exI[where x = "l'0[x0 := rep_of l' x0]"])
+    apply safe using list_update_swap[OF h2] apply fast
+    apply (subst sg1)
+    using BWIPCStep[of x0 y0 l i l'0, OF sg2 IH'(2)] .
+qed
+
+lemma bw_ipc_compress:
+  assumes "ufa_invar l" "(x,y)\<in>(ufa_\<beta>_start l)" "z = rep_of l y" "bw_ipc (l[x:=z]) y i l''"
+  shows "\<exists>l'. l'' = l'[x:=z] \<and> bw_ipc l y i l'"
+proof -
+  have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
+  have "z<length l" using rep_of_bound assms unfolding ufa_\<beta>_start_def by blast
+  show ?thesis  using assms bw_ipc_compress_preliminary[OF assms(1) _ _ _ \<open>x<length l\<close> \<open>z<length l\<close>]
+  by (metis (mono_tags, lifting) aciclicity case_prodD mem_Collect_eq
+      rtrancl_into_trancl2 ufa_\<beta>_def ufa_\<beta>_start_def)
+qed
+
+
 lemma fw_ipc_bw_ipc:
   assumes "ufa_invar l" "fw_ipc l x i l'"
   shows "bw_ipc l x i l'" 
-  sorry
+  using assms(2,1) proof induction
+case base: (FWIPCBase x l)
+  then show ?case using BWIPCBase by blast
+next
+  case step: (FWIPCStep x y l i l')
+  have sg1: "ufa_invar (l[x := rep_of l y])" using \<open>ufa_invar l\<close> 
+    using rep_of_idx step.hyps(1) ufa_\<beta>_start_def ufa_compress_invar by auto
+  note h4 =  bw_ipc_compress[OF \<open>ufa_invar l\<close> step(1) refl  step(3)[OF sg1]]
+  with step show ?case using BWIPCStep rep_of_idx unfolding ufa_\<beta>_start_def by auto
+qed
+
+notation Ref.update ("_ := _" 62)
+
 
 \<comment>\<open>One probably needs the lemmas of this file (equivalence of the two, properties about
   single step compressions and the predicates) to proceed. But without developing the proofs,
   the concrete required formulation is not yet clear.\<close>
+  
 
 
 
@@ -2695,27 +2876,33 @@ locale Pleasant = \<comment>\<open>Pleasant\<close>
     and level::"nat list \<Rightarrow> nat list \<Rightarrow> nat \<Rightarrow> nat" 
 begin
 
-
-context \<comment>\<open>FK\<close>
+context
   fixes l::"nat list"  and rkl::"nat list"
-assumes contextasm: "invar_rank l rkl" 
 begin
-
-\<comment>\<open> A non-root vertex @{term x} is pleasant if it is OK and if it has a proper non-root
-   ancestor @{term y} such that @{term x} and @{term y} have the same level, 
-   i.e., @{term "level l rkl x = level l rkl y"}. \<close>
 
 definition pleasant where "pleasant x \<equiv> ok l rkl x \<and> x\<noteq>l!x 
     \<and> (\<exists>y. y\<noteq>l!y \<and> ((l!x),y) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> (level l rkl x = level l rkl y) )"
 
-lemma pleasant_non_root:
-  assumes "pleasant x" shows "x\<noteq>l!x"
-  using assms unfolding pleasant_def by fast
 
 definition unpleasant_ancestors where "unpleasant_ancestors x \<equiv> 
                                        (ancestors l x) \<inter> {y. (\<not>pleasant y) \<and> y\<noteq>l!y}"
 
 definition displeasure where "displeasure x \<equiv> card (unpleasant_ancestors x)"
+
+
+context \<comment>\<open>FK\<close>
+ 
+assumes contextasm: "invar_rank l rkl" 
+begin
+
+
+\<comment>\<open> A non-root vertex @{term x} is pleasant if it is OK and if it has a proper non-root
+   ancestor @{term y} such that @{term x} and @{term y} have the same level, 
+   i.e., @{term "level l rkl x = level l rkl y"}. \<close>
+
+lemma pleasant_non_root:
+  assumes "pleasant x" shows "x\<noteq>l!x"
+  using assms unfolding pleasant_def by fast
 
 lemma ancestors_of_parent:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)"
@@ -2932,28 +3119,113 @@ proof -
     by simp
 qed
 
+end
 end \<comment>\<open>Until here the assumtions about ok and level\<close>
 
 end \<comment>\<open>FK\<close>
 
 context \<comment>\<open>Preservation\<close>
   assumes compress_preserves_level_above_y:
-    "\<lbrakk>(x,y)\<in> (ufa_\<beta>_start l); (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v\<rbrakk> \<Longrightarrow> level (l[x:= rep_of l y]) rkl v = level l rkl v"
+    "\<lbrakk>invar_rank l rkl; (x,y)\<in> (ufa_\<beta>_start l); (y,z)\<in> (ufa_\<beta>_start l)\<^sup>* ; 
+     (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v\<rbrakk> 
+        \<Longrightarrow> level (l[x:= z]) rkl v = level l rkl v"
  and compress_preserves_ok_above_y:
-    "\<lbrakk>(x,y)\<in> (ufa_\<beta>_start l); (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> \<Longrightarrow> ok (l[x:= rep_of l y]) rkl v"
+    "\<lbrakk>invar_rank l rkl; (x,y)\<in> (ufa_\<beta>_start l); (y,z)\<in> (ufa_\<beta>_start l)\<^sup>*; 
+      (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> 
+        \<Longrightarrow> ok (l[x:= z]) rkl v"
 begin
 no_notation Ref.update ("_ := _" 62)
 
 
+
 lemma compress_preserves_pleasant_above_y:
-  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,v)\<in> (ufa_\<beta>_start l)\<^sup>*" "pleasant l rkl v"
-  shows "pleasant (l[x:= rep_of l y]) rkl v"
-  sorry
+  assumes "invar_rank l rkl"
+          "(x,y)\<in> (ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "(y,v)\<in> (ufa_\<beta>_start l)\<^sup>*" 
+          "pleasant l rkl v"
+  shows "pleasant (l[x:= z]) rkl v"
+proof -
+  have "x<length l" "y<length l" using assms(2) unfolding ufa_\<beta>_start_def by auto
+  have "v<length l" using assms(4) \<open>y<length l\<close> unfolding ufa_\<beta>_start_def by induction auto
+  have "z<length l" using assms(3) \<open>y<length l\<close> unfolding ufa_\<beta>_start_def by induction auto
+  obtain av where asm: "ok l rkl v" " v \<noteq> l ! v" 
+                      " av \<noteq> l ! av" "(l ! v, av) \<in> (ufa_\<beta>_start l)\<^sup>* "
+                      "level l rkl v = level l rkl av" using assms(5) unfolding pleasant_def
+    by blast
+
+  have "x\<noteq>v" using  paths_have_distinct_endpoints[OF invar_rank_ufa_invarI[OF assms(1)] 
+                    \<open>x<length l\<close> \<open>v<length l\<close>] 
+    by (metis assms(2,4) rtrancl_into_trancl2 ufa_\<beta>_def)
+
+  have "(y,l!v)\<in>(ufa_\<beta>_start l)\<^sup>*" using \<open>v<length l\<close> rep_of_bound invar_rank_ufa_invarI[OF assms(1)]
+  assms(4) unfolding ufa_\<beta>_start_def
+    by (metis (mono_tags, lifting) asm(2) case_prodI mem_Collect_eq rtrancl.simps ufa_invarD(2))
+  
+  show ?thesis unfolding pleasant_def 
+    apply safe
+    using compress_preserves_ok_above_y assms asm apply blast
+    using compress_preserves_roots_converse apply (simp add: \<open>x \<noteq> v\<close> asm(2))
+    apply (rule exI[where x = av])
+    apply safe
+    using compress_preserves_roots_converse 
+      apply (metis \<open>x < length l\<close> aciclicity asm(3) assms(2,3) invar_rank_ufa_invarI[OF assms(1)]
+            nth_list_update_eq nth_list_update_neq rtrancl_into_trancl2 ufa_\<beta>_def)
+     apply (rule compress_preserves_paths_out_of_y') 
+    using assms  apply blast
+        apply (rule invar_rank_ufa_invarI[OF assms(1)])
+       apply (simp add: \<open>x \<noteq> v\<close> asm(4))
+      apply (simp add: \<open>(y, l ! v) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> \<open>x \<noteq> v\<close>)
+     apply (rule assms(3))
+    using compress_preserves_level_above_y assms asm 
+    by (smt \<open>(y, l ! v) \<in> (ufa_\<beta>_start l)\<^sup>*\<close> rtrancl_trans)
+qed
+
+
+
+lemma compress_preserves_displeasure_of_y_preliminary:
+  assumes "invar_rank l rkl" "(x,y) \<in> (ufa_\<beta>_start l)" "(y,z) \<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "displeasure (l[x:= z]) rkl y \<le> displeasure l rkl y "
+proof -
+  have "x<length l" "y<length l" using assms unfolding ufa_\<beta>_start_def by auto
+  show ?thesis
+    unfolding displeasure_def
+              unpleasant_ancestors_def
+  proof (rule card_mono, goal_cases)
+    case 1
+    then show ?case  apply (rule finite_Int)
+      using subset_eq_atLeast0_lessThan_finite[OF ancestors_in_domain[OF \<open>y<length l\<close>]]
+      by blast
+  next
+    case 2
+    then show ?case proof (rule, goal_cases)
+      case (1 x')
+      have prems1: "(y, x') \<in> (ufa_\<beta>_start (l[x := z]))\<^sup>*" using 1 unfolding ancestors_def by blast
+      have prems2: " \<not> pleasant (l[x := z]) rkl x'" " x' \<noteq> (l[x := z]) ! x'" using 1 
+        unfolding ancestors_def by blast+
+      have sg1: "(y, x') \<in> (ufa_\<beta>_start l)\<^sup>*" using prems1 
+          compress_preserves_paths_converse[OF _ _ prems1] assms(2,3) by blast
+      have sg2: "\<not> pleasant l rkl x'"  
+        using compress_preserves_pleasant_above_y[OF assms(1,2,3)] sg1 prems2 by blast
+      have sg3: "x' \<noteq> l!x'" using prems2(2) assms 
+        by (metis \<open>x < length l\<close> aciclicity assms(1) invar_rank_ufa_invarI nth_list_update_neq 
+            rtrancl_into_trancl2 sg1 ufa_\<beta>_def)
+      show ?case using sg1 sg2 sg3 unfolding ancestors_def by blast
+    qed
+  qed
+qed
+        
+
 
 lemma compress_preserves_displeasure_of_y:
-  assumes "(x,y) \<in> (ufa_\<beta>_start l)" 
+  assumes "invar_rank l rkl" "(x,y) \<in> (ufa_\<beta>_start l)" 
   shows "displeasure (l[x:= rep_of l y]) rkl y \<le> displeasure l rkl y "
-  sorry
+proof -
+  have "x<length l" "y<length l" using assms unfolding ufa_\<beta>_start_def by auto
+  show ?thesis
+  using compress_preserves_displeasure_of_y_preliminary[OF assms(1,2)]
+    rep_of_path_iff[OF invar_rank_ufa_invarI[OF assms(1)] 
+      rep_of_bound[OF  invar_rank_ufa_invarI[OF assms(1)] \<open>y<length l\<close>] \<open>y<length l\<close> ]
+  by blast
+qed
 
 
 notation Ref.update ("_ := _" 62)
@@ -2962,10 +3234,16 @@ end \<comment>\<open>Preservation\<close>
 end \<comment>\<open>Pleasant\<close>
 
 
-
 \<comment>\<open>The predicate top_part corresponds to the "top part of the path"
    mentioned in the proof of Lemma 4.11.\<close>
 definition top_part where "top_part l rkl x \<equiv> \<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
+
+definition top_part' where "top_part' z l rkl x \<equiv> (rep_of l x = z) \<and> 
+                                                  (\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (rep_of l x)))"
+
+lemma top_part_alt:
+  "top_part l rkl x = top_part' (rep_of l x) l rkl x"
+  unfolding top_part_def top_part'_def by blast
 
 context \<comment>\<open>invar_rank\<close>
   fixes l::"nat list" and rkl::"nat list"
@@ -2982,8 +3260,10 @@ proof -
   have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
   have "y<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
   have h2: "(x,y)\<in>(ufa_\<beta>_start l)\<^sup>*" using assms(2) by blast
-  have h3: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using rep_of_ufa_\<beta>_refl[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] assms(2) 
-    by (smt \<open>ufa_invar l\<close> case_prodD mem_Collect_eq rep_of_bound rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
+  have h3: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" 
+    using rep_of_ufa_\<beta>_refl[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>] assms(2) 
+    by (smt \<open>ufa_invar l\<close> case_prodD mem_Collect_eq rep_of_bound rep_of_idx 
+        rep_of_path_iff ufa_\<beta>_start_def)
   hence "rep_of l x < length l"  by (simp add: \<open>ufa_invar l\<close> \<open>x < length l\<close> rep_of_bound)
   have h4: "rep_of l x = rep_of l y" using assms \<open>ufa_invar l\<close> rep_of_idx 
     unfolding ufa_\<beta>_start_def by force
@@ -2996,28 +3276,27 @@ proof -
 
 
 lemma compress_preserves_top_part_above_y:
-  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "top_part l rkl v"
-  shows "top_part (l[x:=rep_of l x]) rkl v"
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "v<length l" "top_part' z' l rkl v"
+  shows "top_part' z' (l[x:=z]) rkl v"
 proof -
-  have sg1: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" using assms(1)
-    by (smt case_prodD contextasm invar_rank_ufa_invarI mem_Collect_eq rep_of_bound
-        rep_of_idx rep_of_path_iff ufa_\<beta>_start_def)
-  show ?thesis using assms(2) 
-      compress_preserves_rep_of_direct[OF assms(1) invar_rank_ufa_invarI[OF contextasm] sg1 refl]
-  unfolding top_part_def 
-  sorry 
+  have "x<length l" using assms unfolding ufa_\<beta>_start_def by blast
+  show ?thesis unfolding top_part'_def
+    apply safe
+    using compress_preserves_rep_of_direct' assms  unfolding top_part'_def sorry      
 qed
 
 end \<comment>\<open>invar_rank\<close>
 
-interpretation pl: Pleasant top_part level .
+
+
 
 
 context \<comment>\<open>invar_rank\<close>
-  fixes l::"nat list" and rkl::"nat list"
+  fixes l::"nat list" and rkl::"nat list" and x::nat
   assumes contextasm: "invar_rank l rkl"
 begin
 
+interpretation pl: Pleasant "top_part' (rep_of l x)" level .
 
 \<comment>\<open>The proof of Lemma 4.11 says this is a strict inequality. This is
    true. Here, we do not exploit the fact that a level is at least 1,
@@ -3027,17 +3306,40 @@ lemma bounded_displeasure_alstrup:
   assumes "top_part l rkl x" "x<length l"
   shows "pl.displeasure l rkl x \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
 proof (rule pl.bounded_displeasure_preliminary_2[OF contextasm ], goal_cases)
-  case (1 x y)
-  then show ?case  using top_part_hereditary[OF contextasm] by blast
+  case (1 x' y)
+  hence eq1: "rep_of l x' = rep_of l x" unfolding top_part'_def by blast
+  have eq: "rep_of l x' = rep_of l y" using 1 unfolding ufa_\<beta>_start_def
+    using invar_rank_ufa_invarI[OF contextasm] rep_of_idx  by auto
+  show ?case  apply (subst eq1[symmetric]) apply (subst eq) apply (subst top_part_alt[symmetric])
+    using top_part_hereditary[OF contextasm] 1 
+    apply (subst (asm) eq1[symmetric]) 
+    apply (subst (asm) top_part_alt[symmetric])
+    by blast
 next
   case (2 y)
   hence "l!y < length l" using  invar_rank_ufa_invarI[OF contextasm] ufa_invarD(2) by blast
   hence py: "(y,l!y) \<in> ufa_\<beta>_start l" unfolding ufa_\<beta>_start_def using 2 by blast
+  have eq: "(rep_of l x) = rep_of l y" using 2 unfolding top_part'_def by argo
+  hence eq': "rep_of l (l ! y) = (rep_of l x)" 
+    using "2"(2) contextasm invar_rank_ufa_invarI rep_of_idx by auto
   have hrpy: "\<alpha>\<^sub>r (rankr rkl (l ! y)) = \<alpha>\<^sub>r (rankr rkl (rep_of l (l ! y)))" 
-    using  top_part_hereditary[OF contextasm 2(1) py] unfolding top_part_def .
+    using  top_part_hereditary[OF contextasm _ py] 2(1)  eq top_part_alt 
+    unfolding top_part_def by simp
   show ?case
-    using hrpy 2(1) assms(1) level_lt_\<alpha>\<^sub>r[OF contextasm 2(2) 2(3)[symmetric]]  unfolding top_part_def sorry
-qed (auto simp add: assms)
+    using hrpy 2(1) assms(1) level_lt_\<alpha>\<^sub>r[OF contextasm 2(2) 2(3)[symmetric]] eq' unfolding top_part_def 
+    by argo
+qed (auto simp add: assms top_part_alt[symmetric])
+end
+
+
+
+interpretation pl: Pleasant top_part level .
+
+context \<comment>\<open>invar_rank\<close>
+  fixes l::"nat list" and rkl::"nat list" 
+  assumes contextasm: "invar_rank l rkl"
+begin
+
 
 
 \<comment>\<open>During a path compression step at x, the vertex x is the only one whose
@@ -3083,26 +3385,13 @@ proof -
 qed
     
 
-lemma compress_changes_parent_of_x_to_z:
-  assumes "x<length l"  
-  shows "(l[x:= rep_of l x])!x = rep_of l x"
-  using assms by auto
-
-lemma compress_preserves_roots_converse:
-  assumes "r = (l[x:= rep_of l x])!r"
-  shows "r = l!r"
-  using assms
-  by (metis contextasm invar_rank_ufa_invarI  nth_list_update_neq nth_update_invalid
-      rep_of_min rep_of_refl ufa_compress_aux(2))
-
-
 lemma pleasant_\<phi>:
   assumes "x<length l" "pl.pleasant l rkl x"
   shows "\<phi> (l[x:= rep_of l x]) rkl x < \<phi> l rkl x"
 proof -
   have sg1: "top_part l rkl x" "x \<noteq> l ! x"
     "(\<exists>y. y \<noteq> l ! y \<and> (l ! x, y) \<in> (ufa_\<beta>_start l)\<^sup>* \<and> level l rkl x = level l rkl y)" 
-    using assms(2) unfolding pl.pleasant_def[OF contextasm] by blast+
+    using assms(2) unfolding pl.pleasant_def by blast+
   have hNonRoot: "x \<noteq> l ! x" using sg1(2) .
   have h2: "\<alpha>\<^sub>r (rankr rkl x) = \<alpha>\<^sub>r (rankr rkl (rep_of l x))" using sg1(1) unfolding top_part_def .
   obtain y where 
@@ -3113,10 +3402,10 @@ proof -
         mem_Collect_eq rtrancl.simps ufa_\<beta>_start_def ufa_invarD(2))
   have h6: "(l!x, rep_of l x)\<in> (ufa_\<beta>_start l)\<^sup>*"  using assms 
     using contextasm invar_rank_ufa_invarI rep_of_bound rep_of_idx rep_of_path_iff ufa_invarD(2) 
-    unfolding pl.pleasant_def[OF contextasm] by auto
+    unfolding pl.pleasant_def by auto
   have h7: "\<alpha>\<^sub>r (rankr rkl x) \<le> \<alpha>\<^sub>r (rankr rkl (l!x))"
     using \<alpha>\<^sub>r_rankr_grows_along_edges[OF contextasm assms(1)] using assms(2) 
-    unfolding pl.pleasant_def[OF contextasm] by argo
+    unfolding pl.pleasant_def by argo
   have h8: "\<alpha>\<^sub>r (rankr rkl (l!x)) \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
     using \<alpha>\<^sub>r_rankr_grows_along_a_path_refl[OF contextasm ufa_invarD(2)
         [OF invar_rank_ufa_invarI[OF contextasm] assms(1)]
@@ -3186,7 +3475,7 @@ begin
 lemma amortized_cost_fw_ipc_top_part_inductive:
   assumes "fw_ipc l x i l'" "top_part l rkl x"
   shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + pl.displeasure l rkl x"
-  unfolding pl.displeasure_def[OF contextasm]
+  unfolding pl.displeasure_def
   using assms contextasm
 proof (induction)
   case (FWIPCBase x l)
@@ -3211,20 +3500,22 @@ next
   have step': " (x, y) \<in> ufa_\<beta>_start l" "fw_ipc (l[x := rep_of l x]) y i l'"
             "\<lbrakk>top_part (l[x := rep_of l x]) rkl y; invar_rank (l[x := rep_of l x]) rkl\<rbrakk>
              \<Longrightarrow> \<Phi> l' rkl + i \<le> \<Phi> (l[x := rep_of l x]) rkl +
-                                 card (pl.unpleasant_ancestors (l[x := rep_of l x]) rkl y)" 
-                "top_part l rkl x" "invar_rank l rkl" using step by (auto simp add: eq)
+                                card
+            (pl.unpleasant_ancestors (l[x := rep_of l y]) rkl y)" 
+                "top_part l rkl x" "invar_rank l rkl" using step 
+    by (auto simp add: eq)
 
   have dpleq: "pl.displeasure (l[x := rep_of l y]) rkl y
-      \<le> pl.displeasure l rkl y" 
-    apply (rule pl.compress_preserves_displeasure_of_y[of x y l rkl, OF _ _ step'(1)])
+      \<le> pl.displeasure l rkl y"  
+    apply (rule  pl.compress_preserves_displeasure_of_y[OF _ _ step(5) step'(1)])
   proof goal_cases
-    case (1 x y l v rkl)
-    then show ?case sorry
+    case (1 l rkl x y z v)
+    show ?case using compress_preserves_level_above_y[OF 1(1,2) 1(3,4,5)] .
   next
-    case (2 x' y' l' v rkl)
-    then show ?case unfolding top_part_def sorry
+    case (2 l rkl x y z v)
+    have "v<length l"  using 2(4) 2 unfolding ufa_\<beta>_start_def by induction auto
+    show ?case using compress_preserves_top_part_above_y 2
   qed
-
   have ir':"invar_rank (l[x := rep_of l x]) rkl" using
         invar_rank_evolution[OF \<open>invar_rank l rkl\<close> EvCompress[OF step'(1), of rkl]] eq by argo
   have sub1: "rep_of (l[x := rep_of l x]) y = rep_of l x" using \<open>rep_of l y = rep_of l x\<close>
@@ -3257,13 +3548,43 @@ next
   qed
 qed
 
+lemma amortized_cost_fw_ipc_top_part_inductive':
+  assumes "fw_ipc l x i l'" "top_part' (rep_of l x) l rkl x"
+  shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + pl.displeasure l rkl x"
+  using assms amortized_cost_fw_ipc_top_part_inductive
+      top_part_alt by blast
+
+lemma displeasure_equiv:
+  "Pleasant.displeasure (top_part' (rep_of l x)) level l rkl x = pl.displeasure l rkl x"
+  unfolding Pleasant.displeasure_def[OF contextasm]
+  unfolding Pleasant.unpleasant_ancestors_def[OF contextasm]
+  unfolding Pleasant.pleasant_def[OF contextasm]
+  apply (subst top_part_alt) apply auto
+  apply (rule bij_betw_same_card[of id])
+  apply (subst bij_betw_id_iff)
+proof (rule Set.equalityI, safe, goal_cases)
+  case (1 x' y)
+  have "rep_of l x' = rep_of l x" using \<open>x'\<in>ancestors l x\<close> unfolding ancestors_def 
+    by (metis (no_types, lifting) case_prodD contextasm converse_rtranclE' invar_rank_ufa_invarI 
+        mem_Collect_eq rep_of_bound rep_of_invar_along_path rtrancl.simps ufa_\<beta>_start_def)
+  with 1 show ?case unfolding top_part'_def by blast
+next
+  case (2 x' y)
+  have "rep_of l x' = rep_of l x" using \<open>x'\<in>ancestors l x\<close> unfolding ancestors_def 
+    by (metis (no_types, lifting) case_prodD contextasm converse_rtranclE' invar_rank_ufa_invarI 
+        mem_Collect_eq rep_of_bound rep_of_invar_along_path rtrancl.simps ufa_\<beta>_start_def)
+  with 2 show ?case unfolding top_part'_def by blast
+qed
+
 
 lemma amortized_cost_fw_ipc_top_part:
   assumes "fw_ipc l x i l'" "top_part l rkl x" "x<length l"
   shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
   using amortized_cost_fw_ipc_top_part_inductive[OF assms(1,2)] 
-        bounded_displeasure_alstrup[OF contextasm assms(2,3)] 
+        bounded_displeasure_alstrup[OF contextasm assms(2,3)]
+  apply (subst(asm) displeasure_equiv)
   by linarith
+  
 
 \<comment>\<open>Say x is "easy" if @{term "alphar \<circ> (rankr rkl)"} is NOT constant all the way from x
    to its root z, but maps x and its parent to the same value. In this case,
@@ -3284,13 +3605,13 @@ proof -
     by blast
   note h = \<phi>_case_2_lower_bound[OF contextasm \<open>x<length l\<close> assms(2)[symmetric] assms(3)]
   have h5: "\<alpha>\<^sub>r (rankr rkl x) \<noteq> \<alpha>\<^sub>r (rankr rkl ((l[x := rep_of l x])!x))" 
-    apply (subst compress_changes_parent_of_x_to_z[OF contextasm assms(1)])
+    apply (subst compress_changes_parent_of_x_to_z[OF assms(1)])
     using assms(3,4) by linarith
   show ?thesis using  h5 
-    apply (subst(asm) compress_changes_parent_of_x_to_z[OF contextasm assms(1)])
+    apply (subst(asm) compress_changes_parent_of_x_to_z[OF assms(1)])
     using \<phi>_case_3 h
-      compress_changes_parent_of_x_to_z[OF contextasm assms(1), symmetric]
-      compress_preserves_roots_converse[OF contextasm, of "rep_of l x" x]
+      compress_changes_parent_of_x_to_z[OF assms(1), symmetric]
+      compress_preserves_roots_converse[of l "rep_of l x" x]
     by (metis One_nat_def \<phi>_case_3 h less_eq_Suc_le)
 qed
 

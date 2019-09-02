@@ -1,0 +1,129 @@
+
+lemma amortized_cost_fw_ipc_top_part_inductive:
+  assumes "fw_ipc l x i l'" "top_part' (rep_of l x) l rkl x"
+  shows "\<Phi> l' rkl + i \<le> \<Phi> l rkl + Pleasant.displeasure (top_part' (rep_of l x)) level l rkl x"
+  using assms contextasm
+proof (induction)
+  case (FWIPCBase x l)
+  then show ?case by linarith
+next
+  case step: (FWIPCStep x' y l' i l'')
+  have "x'<length l'" "y<length l'"  
+    using step  unfolding ufa_\<beta>_start_def by auto 
+  have "invar_rank (l'[x' := rep_of l' y]) rkl" 
+    using  invar_rank_evolution[OF \<open>invar_rank l' rkl\<close>  EvCompress[OF step(1), of rkl]] .
+  have "rep_of l' x' < length l'" using 
+      rep_of_bound[OF invar_rank_ufa_invarI[OF \<open>invar_rank l' rkl\<close>] \<open>x'<length l'\<close>] .
+  have eq: "rep_of l' y = rep_of l' x'"  
+    apply (subst rep_of_path_iff[OF invar_rank_ufa_invarI[OF \<open>invar_rank l' rkl\<close>] 
+                                 \<open>rep_of l' x'<length l'\<close> \<open>y<length l'\<close>])
+    apply safe
+    using step(1) rep_of_ufa_\<beta>_refl[OF invar_rank_ufa_invarI[OF \<open>invar_rank l' rkl\<close>] \<open>x'<length l'\<close>]
+     apply (metis \<open>rep_of l' x' < length l'\<close> \<open>x' < length l'\<close> \<open>y < length l'\<close> invar_rank_ufa_invarI 
+            r_into_rtrancl rep_of_invar_along_path rep_of_path_iff step.prems(2))
+    using \<open>x' < length l'\<close> invar_rank_ufa_invarI rep_of_min step.prems by blast
+
+  have step': " (x', y) \<in> ufa_\<beta>_start l'" "fw_ipc (l'[x' := rep_of l' x']) y i l''"
+            "\<lbrakk>top_part' (rep_of (l'[x' := rep_of l' x']) y) (l'[x' := rep_of l' x']) rkl y;
+              invar_rank (l'[x' := rep_of l' x']) rkl\<rbrakk>
+             \<Longrightarrow> \<Phi> l'' rkl + i
+               \<le> \<Phi> (l'[x' := rep_of l' x']) rkl +
+              Pleasant.displeasure
+            (top_part' (rep_of (l'[x' := rep_of l' y]) y)) level
+            (l'[x' := rep_of l' y]) rkl y" 
+                "top_part' (rep_of l' x') l' rkl x'" "invar_rank l' rkl" 
+    using step by (auto simp add: eq)
+
+  have dpleq: "pl.displeasure (l'[x' := rep_of l' y]) rkl y
+      \<le> pl.displeasure l' rkl y" 
+    apply (rule pl.compress_preserves_displeasure_of_y[OF _ _ step'(1), of rkl])
+  proof goal_cases
+    case (1 l rkl x y v)
+    hence sg1: "(y, rep_of l x) \<in> (ufa_\<beta>_start l)\<^sup>*" 
+      by (smt case_prodD invar_rank_ufa_invarI mem_Collect_eq rep_of_bound 
+          rep_of_idx rep_of_path_iff ufa_\<beta>_start_def) 
+    show ?case using compress_preserves_level_above_y[OF 1(1,2) sg1 1(3) \<open>v\<noteq>l!v\<close>] .
+  next
+    case (2 l0 rkl x0 y v)
+    have "v<length l0"  using 2(3) 2 unfolding ufa_\<beta>_start_def by induction auto
+    have eq: "rep_of l x = rep_of l0 v" using 2(5) unfolding top_part'_def by argo
+    have sg1: "top_part l0 rkl v" using 2(5) apply (subst (asm) eq) using top_part_alt by blast
+    have sg2: "rep_of (l0[x0 := rep_of l0 x0]) v = (rep_of l0 v)" 
+      by (metis "2"(1) \<open>v < length l0\<close> invar_rank_ufa_invarI list_update_beyond 
+          not_le_imp_less ufa_compress_aux(2))
+    show ?case apply (subst eq)
+      using compress_preserves_top_part_above_y[OF 2(1,2) \<open>v<length l0\<close> sg1]  
+        apply (subst (asm) top_part_alt) apply (subst (asm) sg2) .
+  qed
+  have ir':"invar_rank (l'[x' := rep_of l' x']) rkl" using
+        invar_rank_evolution[OF \<open>invar_rank l' rkl\<close> EvCompress[OF step'(1), of rkl]] eq by argo
+  have sub1: "rep_of (l'[x' := rep_of l' x']) y = rep_of l' x'" using \<open>rep_of l' y = rep_of l' x'\<close>
+        using \<open>x' < length l'\<close> \<open>y < length l'\<close> invar_rank_ufa_invarI step.prems ufa_compress_aux(2) by auto
+  have tpy: "top_part (l'[x' := rep_of l' x']) rkl y" 
+        using top_part_hereditary[OF \<open>invar_rank l' rkl\<close> _  step'(1)]  step'(4) top_part_alt
+        unfolding top_part_def 
+        apply (subst sub1) apply(subst eq[symmetric]) by presburger  
+  hence tpy': " top_part' (rep_of (l'[x' := rep_of l' x']) y) (l'[x' := rep_of l' x']) rkl y"
+        using top_part_alt by blast
+  note IH' = step'(3)[OF tpy' ir']
+  then show ?case proof (cases "pl.pleasant l' rkl x'")
+    case True
+    have "x' \<noteq> l'!x'" using step'(1) unfolding ufa_\<beta>_start_def by blast
+    have "x'<length l'" using step'(1) unfolding ufa_\<beta>_start_def by blast
+    have eq: "rep_of l' x' = rep_of l x" using True  
+      using top_part'_def unfolding pl.pleasant_def[OF \<open>invar_rank l' rkl\<close>] by blast
+    have eq': "rep_of l' x' = rep_of l' y" 
+      using \<open>x' < length l'\<close> \<open>y < length l'\<close> invar_rank_ufa_invarI step.prems(2) sub1 
+            ufa_compress_aux(2) by auto
+    have eq''': "(rep_of (l'[x' := rep_of l' x']) y) = rep_of l x" using eq sub1 by auto
+    have equiv: "Union_Find_Time_alpha_abstract_analysis.pl.pleasant l' rkl x'"
+      unfolding Union_Find_Time_alpha_abstract_analysis.pl.pleasant_def[OF \<open>invar_rank l' rkl\<close>]
+      apply (subst top_part_alt)
+      apply (subst eq)
+      using True  
+      unfolding pl.pleasant_def[OF \<open>invar_rank l' rkl\<close>] by blast
+    have equiv': " Pleasant.displeasure (top_part' (rep_of l' x')) level l'
+        rkl x' = local.pl.displeasure l' rkl x'"
+      unfolding pl.displeasure_def[OF \<open>invar_rank l' rkl\<close>]
+      unfolding pl.unpleasant_ancestors_def[OF \<open>invar_rank l' rkl\<close>]
+      unfolding pl.pleasant_def[OF \<open>invar_rank l' rkl\<close>]
+      unfolding Pleasant.displeasure_def[OF \<open>invar_rank l' rkl\<close>]
+      unfolding Pleasant.unpleasant_ancestors_def[OF \<open>invar_rank l' rkl\<close>]
+      unfolding Pleasant.pleasant_def[OF \<open>invar_rank l' rkl\<close>]
+      apply (subst eq)
+      by blast
+
+    have equiv'': "Pleasant.displeasure
+        (top_part' (rep_of (l'[x' := rep_of l' y]) y)) level
+        (l'[x' := rep_of l' y]) rkl y = pl.displeasure  (l'[x' := rep_of l' y]) rkl y"
+      apply (subst eq'[symmetric])+
+      unfolding pl.displeasure_def[OF ir']
+      unfolding pl.unpleasant_ancestors_def[OF ir']
+      unfolding pl.pleasant_def[OF ir']
+      unfolding Pleasant.displeasure_def[OF ir']
+      unfolding Pleasant.unpleasant_ancestors_def[OF ir']
+      unfolding Pleasant.pleasant_def[OF ir']
+      apply (subst eq''') by blast
+
+    show ?thesis 
+      apply (subst equiv')
+      using pl.displeasure_parent_if_pleasant[OF \<open>invar_rank l' rkl\<close> step'(1) True]
+      from_\<phi>_to_\<Phi>[OF \<open>invar_rank l' rkl\<close> \<open>x'\<noteq>l'!x'\<close>  
+                  pleasant_\<phi>[OF \<open>invar_rank l' rkl\<close> \<open>x'<length l'\<close> equiv]] 
+      using IH' True dpleq 
+      apply (subst (asm) equiv'')
+      using eq by linarith
+      
+      
+  next
+    case False
+    show ?thesis 
+      (*apply (subst pl.displeasure_def[OF \<open>invar_rank l' rkl\<close>, symmetric])*)
+      using 
+        Pleasant.displeasure_parent_if_unpleasant[OF \<open>invar_rank l' rkl\<close> step'(1) False]
+        arbitrary_\<Phi>[OF \<open>invar_rank l' rkl\<close> step'(1)] IH' False dpleq 
+      (*apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l'[x' := rep_of l' x']) rkl\<close>, symmetric])*)
+      
+      using eq    sorry
+  qed
+qed
