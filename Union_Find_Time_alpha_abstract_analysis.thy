@@ -1054,12 +1054,96 @@ qed
 
 no_notation Ref.update ("_ := _" 62)
   
+thm ufa_compress_invar ufa_compress_aux
+
+lemma ufa_compress_aux':
+  assumes I: "ufa_invar l"
+  assumes L[simp]: "x<length l"
+  shows "ufa_invar (l[x := rep_of l x])" 
+  and "\<forall>i<length l. rep_of (l[x := rep_of l x]) i = rep_of l i"
+proof -
+  {
+    fix i
+    assume "i<length (l[x := rep_of l x])"
+    hence IL: "i<length l" by simp
+
+    have G1: "l[x := rep_of l x] ! i < length (l[x := rep_of l x])"
+      using I IL 
+      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
+    from I IL have G2: "rep_of (l[x := rep_of l x]) i = rep_of l i 
+      \<and> rep_of_dom (l[x := rep_of l x], i)"
+    proof (induct rule: rep_of_induct)
+      case (base i)
+      thus ?case
+        apply (cases "x=i")
+        apply (auto intro: rep_of.domintros simp: rep_of_refl)
+        done
+    next
+      case (step i) 
+      hence D: "rep_of_dom (l[x := rep_of l x], i)"
+        apply -
+        apply (rule rep_of.domintros)
+        apply (cases "x=i")
+        apply (auto intro: rep_of.domintros simp: rep_of_min)
+        done
+      
+      thus ?case apply simp using step
+        apply -
+        apply (subst rep_of.psimps[OF D])
+        apply (cases "x=i")
+        apply (auto simp: rep_of_min rep_of_idx)
+        apply (subst rep_of.psimps[where i="rep_of l i"])
+        apply (auto intro: rep_of.domintros simp: rep_of_min)
+        done
+    qed
+    note G1 G2
+  } note G=this
+
+  thus "\<forall>i<length l. rep_of (l[x := rep_of l x]) i = rep_of l i"
+    by auto
+
+  from G show "ufa_invar (l[x := rep_of l x])" 
+    by (auto simp: ufa_invar_def)
+qed
+
+
 
 lemma ufa_compress_generalized:
   assumes I: "ufa_invar l"
   assumes L[simp]: "x<length l" "z<length l"
+  assumes A: "(x,z)\<in> (ufa_\<beta>_start l)\<^sup>*"
   shows "ufa_invar (l[x := z])" 
-  sorry
+  proof -
+  {
+    fix i
+    assume "i<length (l[x := z])"
+    hence IL: "i<length l" by simp
+
+    have S: "rep_of_dom (l,z)" using I L unfolding ufa_invar_def by blast
+    
+    have G1: "l[x := z] ! i < length (l[x := z])"
+      using I IL 
+      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
+    from I IL have G2: "rep_of_dom (l[x := z], i)"
+    proof (induction rule: rep_of_induct)
+      case (base i)
+      have eq: "l[i := z]!i = z" using base(2) L by auto
+      then show ?case using base       
+        apply (cases "x=i")
+         apply (auto intro: rep_of.domintros simp: rep_of_refl )
+          
+        using rep_of.domintros[of "l[i:=z]" i]
+        sorry
+    next
+      case (step i)
+      then show ?case sorry
+    qed
+    note G1 G2
+  } note G = this
+  from G show ?thesis unfolding ufa_invar_def by blast
+qed
+
+
 notation Ref.update ("_ := _" 62)
 
 
@@ -1578,24 +1662,78 @@ next
     by (meson \<open>y0 \<noteq> x\<close> compress_preserves_other_edges converse_rtrancl_into_rtrancl)
 qed
 
+
+lemma compress_preserves_paths_to_roots':
+  assumes "ufa_invar l" "(v,r)\<in>(ufa_\<beta>_start l)\<^sup>*" "r = l!r" "(y,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
+  shows "(v,r)\<in>(ufa_\<beta>_start (l[x:=z]))\<^sup>*"
+  using assms(2,1,3) proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by blast
+next
+  case (step v w)
+  have sg1: "(v,r)\<in>(ufa_\<beta>_start l)\<^sup>*"  using step by fastforce
+  have sg2: "v<length l" "w<length l" using step(1) unfolding ufa_\<beta>_start_def by auto
+  have sg3: "r<length l" using step(2) sg2(2) unfolding ufa_\<beta>_start_def by induction auto
+  have sg4: "x<length l" "y<length l" using x_edge_y unfolding ufa_\<beta>_start_def by auto
+  have sg5: "z<length l" using assms(4) sg4(2) unfolding ufa_\<beta>_start_def by induction auto
+  show ?case using step proof (cases "x=v")
+    case True
+    have "r = rep_of l v" using sg1 step(5) 
+        rep_of_path_iff[OF \<open>ufa_invar l\<close> \<open>r<length l\<close> \<open>v<length l\<close>] by presburger
+    hence h2: "r = rep_of l x" using True by argo
+    hence h3: "r = rep_of l z" using x_edge_y assms(4) 
+      using rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>z<length l\<close>]
+            rep_of_path_iff[OF \<open>ufa_invar l\<close> \<open>r<length l\<close> \<open>x<length l\<close>]
+            assms(3) sg1 True 
+      by (metis rep_of_bound rep_of_invar_along_path sg2(2) sg4(1) sg4(2) sg5 step.hyps(1,2)
+                step.prems(1) ufa_\<beta>_start_functional)
+    
+    show ?thesis 
+      apply (rule converse_rtrancl_into_rtrancl[where b = z]) 
+       apply (subst True[symmetric])+ 
+      subgoal unfolding ufa_\<beta>_start_def apply (subst length_list_update)+
+        using \<open>x<length l\<close> \<open>z<length l\<close> 
+        by (smt aciclicity assms(4) case_prodI mem_Collect_eq nth_list_update_eq 
+            rtrancl_into_trancl2 sg2(1) step.prems(1) ufa_\<beta>_def ufa_\<beta>_start_def x_edge_y)
+      using h3 rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>z<length l\<close>] 
+            assms(4) compress_preserves_paths_out_of_y' step.prems(1) by blast
+  next
+    case False
+    then show ?thesis 
+      by (metis compress_preserves_other_edges converse_rtrancl_into_rtrancl 
+          step.IH step.hyps(1) step.prems(1,2))
+  qed
+qed
+
+
 lemma compress_preserves_rep_of_direct':
   assumes "ufa_invar l" "r = rep_of l x" "(y,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "r = rep_of (l[x := z]) x"
   using x_edge_y \<open>ufa_invar l\<close> assms(2)
 proof -
+  have sg0: "x<length l" "y<length l" using x_edge_y unfolding ufa_\<beta>_start_def by auto
+  have sg00: "z<length l" using assms(3) sg0(2) unfolding ufa_\<beta>_start_def by induction auto
   have sg1: "rep_of l x = rep_of l y" using x_edge_y \<open>ufa_invar l\<close> 
     using rep_of_idx ufa_\<beta>_start_def by auto
   have sg2: "rep_of l y = rep_of l z" using assms(3) 
     by (metis (no_types, lifting) sg1 assms(2) case_prodD assms(1) mem_Collect_eq 
         rep_of_bound rep_of_invar_along_path rtrancl.simps ufa_\<beta>_start_def x_edge_y)
+  have sg3': "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*" using x_edge_y assms(3) by simp
   have sg3: "rep_of (l[x := z]) x = rep_of (l[x := z]) z" 
     by (metis (no_types, lifting) assms(3) case_prodD assms(1) length_list_update mem_Collect_eq 
-        nth_list_update_eq rep_of_idx rtrancl.simps ufa_\<beta>_start_def ufa_compress_generalized x_edge_y)
+        nth_list_update_eq rep_of_idx rtrancl.simps ufa_\<beta>_start_def 
+        ufa_compress_generalized[OF _ _ _ sg3'] x_edge_y)
+  have sg4': "(z, rep_of l z) \<in> (ufa_\<beta>_start l)\<^sup>*""l ! rep_of l z = rep_of l z"
+    using rep_of_path_iff[OF assms(1) rep_of_bound[OF assms(1) sg00] sg00] by auto
   have sg4: "rep_of (l[x := z]) z = rep_of l z" 
     apply (cases "x = z")
     subgoal using x_edge_y assms(3) 
       by (metis aciclicity assms(1) list_update_beyond not_le_imp_less rtrancl_into_trancl2 ufa_\<beta>_def) 
-    sorry
+    using compress_preserves_paths_to_roots'[OF assms(1) sg4'(1) sg4'(2)[symmetric] assms(3)]
+          sg4' 
+    by (metis aciclicity assms(1) length_list_update nth_list_update_neq rep_of_bound 
+        rep_of_path_iff rep_of_ufa_\<beta>_refl rtrancl_into_trancl1 sg0 sg00 sg2 ufa_\<beta>_def 
+        ufa_compress_generalized[OF _ _ _ sg3'] x_edge_y)
   thus ?thesis using sg1 sg2 sg3 sg4 assms by argo
 qed
 
@@ -2693,6 +2831,7 @@ lemma compress_preserves_roots_converse':
 
 lemma compress_preserves_rep_of_weak_converse:
   assumes "ufa_invar l"  "(y,x)\<notin>(ufa_\<beta>_start l)\<^sup>*" "x<length l" "y<length l" "z<length l"
+          "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "rep_of (l[x:=z]) y = rep_of l y"
 proof -
   have path: "(y, rep_of l y) \<in> (ufa_\<beta>_start l)\<^sup>* " "l ! rep_of l y = rep_of l y" 
@@ -2703,14 +2842,15 @@ proof -
   have rootcom: "l[x:=z] ! (rep_of l y) = rep_of l y" 
     using path(2) assms(2,4)  unfolding ufa_\<beta>_start_def 
     by (metis assms(2) compress_preserves_roots_other_than_x path(1))
-
-  show ?thesis using rep_of_path_iff assms pathcom rootcom path ufa_compress_generalized 
-      rep_of_bound  by force    
+  
+  show ?thesis using rep_of_path_iff assms pathcom rootcom path 
+      ufa_compress_generalized[OF _ _ _ assms(6)] rep_of_bound  by force    
 qed
   
 
 lemma compress_preserves_rep_of_weak:
   assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
+          "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "rep_of (l[x:=z]) y = rep_of l y"
 proof -
   have "y\<noteq>x" using assms unfolding ufa_\<beta>_start_def by blast
@@ -2719,14 +2859,15 @@ proof -
     then show ?case using rep_of_refl by auto
   next
     case (step i)
-    have "ufa_invar (l[x := z])" using ufa_compress_generalized[OF assms(1,2,4)] .
+    have "ufa_invar (l[x := z])" using ufa_compress_generalized[OF assms(1,2,4,6)] .
     then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>] 
-      using compress_preserves_rep_of_weak_converse step by blast
+      using compress_preserves_rep_of_weak_converse step assms by blast
   qed
 qed
 
 lemma fw_ipc_compress_preliminary:
-  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l" "x<length l" "z<length l"
+  assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l" "x<length l" "z<length l" 
+          "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "fw_ipc (l[x := z]) y i (l'[x := z])"
   using assms proof (induction l y i l' rule: fw_ipc.induct)
   case base: (FWIPCBase y0 l)
@@ -2745,13 +2886,21 @@ next
   have sg3'': "(z', x) \<notin> (ufa_\<beta>_start l)\<^sup>*" using step(1,4) 
     by (meson converse_rtrancl_into_rtrancl)
   have sg3: "rep_of (l[x := z]) z' = rep_of l z' " using 
-      compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>  sg3' \<open>z<length l\<close> sg3''] .
+      compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>  sg3' \<open>z<length l\<close> sg3''  step(8)] .
+  
   have IHfw_ipc: "fw_ipc (l[y := rep_of l z', x := z]) z' i (l'[x := z])" 
     apply (rule step(3))
     subgoal apply (rule ccontr)
     using compress_preserves_paths_converse[OF step(1) sg1, of z' x] step(4)
     by (meson converse_rtrancl_into_rtrancl step.hyps(1))
-  using rep_of_idx step assms ufa_compress_invar unfolding ufa_\<beta>_start_def by auto
+  using rep_of_idx step assms ufa_compress_invar unfolding ufa_\<beta>_start_def 
+     apply force 
+  subgoal using step(8) unfolding ufa_\<beta>_start_def length_list_update using step.prems(3) by blast
+  subgoal using step(8) unfolding ufa_\<beta>_start_def length_list_update using step.prems(4) by blast
+  subgoal using step.prems(3,4) step(8)  unfolding length_list_update ufa_\<beta>_start_def 
+    apply (cases "x = z") apply auto sorry
+   
+  done
   show ?case 
     apply (rule FWIPCStep)
      apply (rule sg2)
@@ -2765,10 +2914,20 @@ notation Ref.update ("_ := _" 62)
 lemma fw_ipc_compress:
   assumes "ufa_invar l" "(x,y)\<in>(ufa_\<beta>_start l)" "fw_ipc l y i l'"
   shows "fw_ipc (l[x := rep_of l y]) y i (l'[x := rep_of l y])"
+proof -
+  have sg1: "rep_of l x = rep_of l y" using assms
+    using rep_of_idx ufa_\<beta>_start_def by auto 
+  have "(y,rep_of l y) \<in> (ufa_\<beta>_start l)\<^sup>*" using assms rep_of_path_iff[OF assms(1)]
+      assms(2) rep_of_bound[OF assms(1)] unfolding ufa_\<beta>_start_def by blast
+  with sg1 have sg2: "(x,rep_of l y) \<in> (ufa_\<beta>_start l)\<^sup>*" using assms rep_of_path_iff[OF assms(1)]
+      assms(2) rep_of_bound[OF assms(1)] unfolding ufa_\<beta>_start_def by blast
+  show ?thesis
   apply (rule fw_ipc_compress_preliminary[OF assms(3) _ assms(1), of x "rep_of l y"])
   using assms(2) aciclicity[OF assms(1)] unfolding ufa_\<beta>_def ufa_\<beta>_start_def
     apply (metis (no_types, lifting) mem_Collect_eq old.prod.case rtrancl_into_trancl1)
-  using assms(1,2) rep_of_bound unfolding ufa_\<beta>_start_def by auto
+  using assms(1,2) rep_of_bound sg2 unfolding ufa_\<beta>_start_def 
+  by auto
+qed
 
 lemma bw_ipc_fw_ipc:
   assumes "ufa_invar l" "bw_ipc l x i l'" 
@@ -2790,7 +2949,7 @@ no_notation Ref.update ("_ := _" 62)
 
 lemma bw_ipc_compress_preliminary:
   assumes "ufa_invar l" "bw_ipc lxz y i lxz'"  "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "lxz = (l[x:=z])" 
-          "x<length l" "z<length l"
+          "x<length l" "z<length l" "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "\<exists>l'. lxz' = l'[x:=z] \<and> bw_ipc l y i l'"
   using assms(2,1,3,4) proof (induction)
   case base: (BWIPCBase x l')
@@ -2808,7 +2967,7 @@ next
   have "x0<length l" using h3 unfolding ufa_\<beta>_start_def step by auto
   have sg1: "rep_of l' x0 = rep_of l x0" apply (subst \<open>l' = l[x := z]\<close>) 
     using compress_preserves_rep_of_weak_converse
-          [OF assms(1) step(5) \<open>x<length l\<close> \<open>x0<length l\<close> \<open>z<length l\<close>] .
+          [OF assms(1) step(5) \<open>x<length l\<close> \<open>x0<length l\<close> \<open>z<length l\<close> assms(7)] .
   have sg2': "(x0, y0) \<in> (ufa_\<beta>_start (l[x := z]))\<^sup>*" using step by blast
   have sg2: "(x0, y0) \<in> (ufa_\<beta>_start l)" using step 
           compress_preserves_other_edges_converse by blast
@@ -2826,7 +2985,10 @@ lemma bw_ipc_compress:
 proof -
   have "x<length l" using assms(2) unfolding ufa_\<beta>_start_def by blast
   have "z<length l" using rep_of_bound assms unfolding ufa_\<beta>_start_def by blast
-  show ?thesis  using assms bw_ipc_compress_preliminary[OF assms(1) _ _ _ \<open>x<length l\<close> \<open>z<length l\<close>]
+  have sg1: "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"  
+    using assms(1-3) rep_of_idx rep_of_ufa_\<beta>_refl unfolding ufa_\<beta>_start_def by force
+  show ?thesis  
+    using assms bw_ipc_compress_preliminary[OF assms(1) _ _ _ \<open>x<length l\<close> \<open>z<length l\<close> sg1]
   by (metis (mono_tags, lifting) aciclicity case_prodD mem_Collect_eq
       rtrancl_into_trancl2 ufa_\<beta>_def ufa_\<beta>_start_def)
 qed
@@ -3274,15 +3436,44 @@ proof -
   qed
   
 
-
 lemma compress_preserves_top_part_above_y:
   assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "v<length l" "top_part' z' l rkl v"
   shows "top_part' z' (l[x:=z]) rkl v"
 proof -
-  have "x<length l" using assms unfolding ufa_\<beta>_start_def by blast
+  have "x<length l" "y<length l" using assms unfolding ufa_\<beta>_start_def by auto
+  have "z<length l" using assms(2) \<open>y<length l\<close> unfolding ufa_\<beta>_start_def by induction auto
+  have sg0: "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"  using assms(1,2) by simp
+  have sg1: "rep_of l v = z'" using assms  unfolding top_part'_def by blast
   show ?thesis unfolding top_part'_def
     apply safe
-    using compress_preserves_rep_of_direct' assms  unfolding top_part'_def sorry      
+    subgoal 
+      using compress_preserves_rep_of_direct'[OF _ invar_rank_ufa_invarI[OF contextasm] _]
+        ufa_compress_generalized[OF invar_rank_ufa_invarI[OF contextasm] 
+                                 \<open>x<length l\<close> \<open>z<length l\<close> sg0]
+        assms sg1 
+      by (metis \<open>x < length l\<close>  contextasm invar_rank_ufa_invarI 
+          length_list_update list_update_overwrite  ufa_compress_aux(2))
+    using \<open>rep_of (l[x := z]) v = z'\<close> assms(4) top_part'_def by auto
+qed
+
+lemma compress_preserves_top_part_above_y':
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)" "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "v<length l" "top_part' z l rkl v"
+  shows "top_part' z (l[x:=z]) rkl v"
+  using assms compress_preserves_top_part_above_y by blast
+
+
+lemma compress_preserves_top_part_above_y'':
+  assumes "(x,y)\<in> (ufa_\<beta>_start l)"   "(y,z)\<in> (ufa_\<beta>_start l)\<^sup>*" "v<length l" "top_part l rkl v"
+  shows "top_part (l[x:=z]) rkl v"
+proof -
+  have "x<length l" "y<length l" using assms unfolding ufa_\<beta>_start_def by auto
+  hence sg1: "(y,rep_of l y)\<in> (ufa_\<beta>_start l)\<^sup>*" 
+    using rep_of_path_iff[OF invar_rank_ufa_invarI[OF contextasm]]
+          rep_of_bound[OF invar_rank_ufa_invarI[OF contextasm] \<open>y<length l\<close>]
+    by blast
+  show ?thesis using compress_preserves_top_part_above_y'[OF assms(1,2) \<open>v<length l\<close>] assms(4)
+    unfolding top_part'_def top_part_def 
+    using assms(1) assms(2) assms(3) compress_preserves_top_part_above_y top_part'_def by blast
 qed
 
 end \<comment>\<open>invar_rank\<close>
@@ -3307,6 +3498,7 @@ lemma bounded_displeasure_alstrup:
   shows "pl.displeasure l rkl x \<le> \<alpha>\<^sub>r (rankr rkl (rep_of l x))"
 proof (rule pl.bounded_displeasure_preliminary_2[OF contextasm ], goal_cases)
   case (1 x' y)
+
   hence eq1: "rep_of l x' = rep_of l x" unfolding top_part'_def by blast
   have eq: "rep_of l x' = rep_of l y" using 1 unfolding ufa_\<beta>_start_def
     using invar_rank_ufa_invarI[OF contextasm] rep_of_idx  by auto
@@ -3514,7 +3706,7 @@ next
   next
     case (2 l rkl x y z v)
     have "v<length l"  using 2(4) 2 unfolding ufa_\<beta>_start_def by induction auto
-    show ?case using compress_preserves_top_part_above_y 2
+    show ?case using compress_preserves_top_part_above_y''[OF 2(1,2,3)  \<open>v<length l\<close> 2(6)] .
   qed
   have ir':"invar_rank (l[x := rep_of l x]) rkl" using
         invar_rank_evolution[OF \<open>invar_rank l rkl\<close> EvCompress[OF step'(1), of rkl]] eq by argo
@@ -3530,21 +3722,19 @@ next
     case True
     have "x \<noteq> l!x" using step'(1) unfolding ufa_\<beta>_start_def by blast
     have "x<length l" using step'(1) unfolding ufa_\<beta>_start_def by blast
-    show ?thesis apply (subst pl.displeasure_def[OF \<open>invar_rank l rkl\<close>, symmetric])
+    show ?thesis 
       using pl.displeasure_parent_if_pleasant[OF \<open>invar_rank l rkl\<close> step'(1) True]
       from_\<phi>_to_\<Phi>[OF \<open>invar_rank l rkl\<close> \<open>x\<noteq>l!x\<close> pleasant_\<phi>[OF \<open>invar_rank l rkl\<close> \<open>x<length l\<close> True]]
       IH' True dpleq 
-      apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l[x := rep_of l x]) rkl\<close>, symmetric])
-      apply (subst (asm) eq[symmetric])+
-      by linarith
+      unfolding pl.displeasure_def
+      using eq by linarith
   next
     case False
-    show ?thesis apply (subst pl.displeasure_def[OF \<open>invar_rank l rkl\<close>, symmetric])
+    show ?thesis unfolding pl.displeasure_def
       using pl.displeasure_parent_if_unpleasant[OF \<open>invar_rank l rkl\<close> step'(1) False]
         arbitrary_\<Phi>[OF \<open>invar_rank l rkl\<close> step'(1)] IH' False dpleq
-      apply (subst (asm) pl.displeasure_def[OF \<open>invar_rank (l[x := rep_of l x]) rkl\<close>, symmetric])
-      apply (subst (asm) eq[symmetric])+
-      by linarith
+      unfolding pl.displeasure_def
+      using eq by linarith
   qed
 qed
 
@@ -3556,9 +3746,9 @@ lemma amortized_cost_fw_ipc_top_part_inductive':
 
 lemma displeasure_equiv:
   "Pleasant.displeasure (top_part' (rep_of l x)) level l rkl x = pl.displeasure l rkl x"
-  unfolding Pleasant.displeasure_def[OF contextasm]
-  unfolding Pleasant.unpleasant_ancestors_def[OF contextasm]
-  unfolding Pleasant.pleasant_def[OF contextasm]
+  unfolding Pleasant.displeasure_def
+  unfolding Pleasant.unpleasant_ancestors_def
+  unfolding Pleasant.pleasant_def
   apply (subst top_part_alt) apply auto
   apply (rule bij_betw_same_card[of id])
   apply (subst bij_betw_id_iff)
@@ -3766,14 +3956,5 @@ proof -
 qed
 
 end \<comment>\<open>invar_rank\<close>
-
-
-
-
-lemma amortized_cost_compress:
-  assumes "ufa_invar l"
-  shows "\<Phi> l rkl + 2* (\<alpha>\<^sub>r (card (Domain (ufa_\<alpha> l)))) + 4 \<ge> \<Phi> (l[x := rep_of l x]) rkl + d + 1"
-  apply (subst ufa_\<alpha>_dom_card)
-  sorry
 
 end
