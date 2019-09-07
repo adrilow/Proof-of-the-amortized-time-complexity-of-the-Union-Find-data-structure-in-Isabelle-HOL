@@ -36,6 +36,11 @@ function (domintros) rep_of
   where "rep_of l i = (if l!i = i then i else rep_of l (l!i))"
   by pat_completeness auto
 
+inductive is_repr where
+root: "l!i = i \<Longrightarrow> is_repr l i i"  
+|child: "is_repr l (l!i) j \<Longrightarrow> is_repr l i j"
+
+
 text {* A valid union-find structure only contains valid indexes, and
   the @{text "rep_of"} function terminates for all indexes. *}
 definition 
@@ -113,6 +118,50 @@ lemma rep_of_min_upd: "\<lbrakk> ufa_invar l; x<length l; i<length l \<rbrakk> \
 lemma rep_of_idx: 
   "\<lbrakk>ufa_invar l; i<length l\<rbrakk> \<Longrightarrow> rep_of l (l!i) = rep_of l i"
   by (metis rep_of_step)
+
+lemma rep_of_dom_inverse_intro:
+  assumes "rep_of_dom (l,i)" "l!i\<noteq>i"
+  shows "rep_of_dom (l,l!i)"
+  using assms 
+  proof (induction rule: rep_of.pinduct)
+  case (1 l i)
+  then show ?case apply (cases "l ! (l ! i) \<noteq> l ! i") 
+     by (auto intro: rep_of.domintros simp: rep_of.psimps)
+qed
+
+lemma rep_of_is_repr:
+  "is_repr l i j = (rep_of_dom (l,i) \<and> (rep_of l i = j))"
+proof (safe, goal_cases)
+  case 1
+  then show ?case by induction (auto intro: rep_of.domintros)
+next
+  case 2
+  have "rep_of_dom (l, i)" using 2 by induction (auto intro: rep_of.domintros)
+  with 2 show ?case proof induction
+    case (root l i)
+    then show ?case by (auto simp: rep_of.psimps)
+  next
+    case (child l i j)
+    hence "rep_of_dom (l, l ! i)" using rep_of.psimps[OF child(3)]
+      apply (cases "i=l!i") apply auto using rep_of_dom_inverse_intro by presburger
+    with child show ?case by (auto simp add: rep_of.psimps)
+  qed
+next
+  case 3
+  then show ?case proof (induction rule: rep_of.pinduct)
+    case (1 l i)
+    then show ?case apply (cases "l ! i \<noteq> i") proof ( auto,goal_cases)
+      case 1
+      hence "rep_of l i = rep_of l (l ! i)" by (auto simp add: rep_of.psimps)
+      with 1 show ?case by (auto intro: is_repr.intros)
+    next
+      case 2
+      hence "i=rep_of l i" by (auto simp add: rep_of.psimps)
+      with 2 show ?case by (auto intro: is_repr.intros)
+    qed
+  qed
+qed
+
 
 subsubsection {* Abstraction to Partial Equivalence Relation *}
 definition ufa_\<alpha> :: "nat list \<Rightarrow> (nat\<times>nat) set" 
@@ -1050,101 +1099,16 @@ proof -
     done
 qed
 
-
-
-no_notation Ref.update ("_ := _" 62)
-  
-thm ufa_compress_invar ufa_compress_aux
-
-lemma ufa_compress_aux':
-  assumes I: "ufa_invar l"
-  assumes L[simp]: "x<length l"
-  shows "ufa_invar (l[x := rep_of l x])" 
-  and "\<forall>i<length l. rep_of (l[x := rep_of l x]) i = rep_of l i"
-proof -
-  {
-    fix i
-    assume "i<length (l[x := rep_of l x])"
-    hence IL: "i<length l" by simp
-
-    have G1: "l[x := rep_of l x] ! i < length (l[x := rep_of l x])"
-      using I IL 
-      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
-    from I IL have G2: "rep_of (l[x := rep_of l x]) i = rep_of l i 
-      \<and> rep_of_dom (l[x := rep_of l x], i)"
-    proof (induct rule: rep_of_induct)
-      case (base i)
-      thus ?case
-        apply (cases "x=i")
-        apply (auto intro: rep_of.domintros simp: rep_of_refl)
-        done
-    next
-      case (step i) 
-      hence D: "rep_of_dom (l[x := rep_of l x], i)"
-        apply -
-        apply (rule rep_of.domintros)
-        apply (cases "x=i")
-        apply (auto intro: rep_of.domintros simp: rep_of_min)
-        done
-      
-      thus ?case apply simp using step
-        apply -
-        apply (subst rep_of.psimps[OF D])
-        apply (cases "x=i")
-        apply (auto simp: rep_of_min rep_of_idx)
-        apply (subst rep_of.psimps[where i="rep_of l i"])
-        apply (auto intro: rep_of.domintros simp: rep_of_min)
-        done
-    qed
-    note G1 G2
-  } note G=this
-
-  thus "\<forall>i<length l. rep_of (l[x := rep_of l x]) i = rep_of l i"
-    by auto
-
-  from G show "ufa_invar (l[x := rep_of l x])" 
-    by (auto simp: ufa_invar_def)
+lemma is_repr_pathI:
+  assumes "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*" "z=l!z"
+  shows "is_repr l x z"
+  using assms proof (induction rule: converse_rtrancl_induct)
+  case base
+  then show ?case by (auto intro: is_repr.intros)
+next
+  case (step y z)
+  then show ?case unfolding ufa_\<beta>_start_def by (auto intro: is_repr.intros)
 qed
-
-
-
-lemma ufa_compress_generalized:
-  assumes I: "ufa_invar l"
-  assumes L[simp]: "x<length l" "z<length l"
-  assumes A: "(x,z)\<in> (ufa_\<beta>_start l)\<^sup>*"
-  shows "ufa_invar (l[x := z])" 
-  proof -
-  {
-    fix i
-    assume "i<length (l[x := z])"
-    hence IL: "i<length l" by simp
-
-    have S: "rep_of_dom (l,z)" using I L unfolding ufa_invar_def by blast
-    
-    have G1: "l[x := z] ! i < length (l[x := z])"
-      using I IL 
-      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
-    from I IL have G2: "rep_of_dom (l[x := z], i)"
-    proof (induction rule: rep_of_induct)
-      case (base i)
-      have eq: "l[i := z]!i = z" using base(2) L by auto
-      then show ?case using base       
-        apply (cases "x=i")
-         apply (auto intro: rep_of.domintros simp: rep_of_refl )
-          
-        using rep_of.domintros[of "l[i:=z]" i]
-        sorry
-    next
-      case (step i)
-      then show ?case sorry
-    qed
-    note G1 G2
-  } note G = this
-  from G show ?thesis unfolding ufa_invar_def by blast
-qed
-
-
-notation Ref.update ("_ := _" 62)
 
 
 lemma descendant_of_root:
@@ -1638,12 +1602,36 @@ lemma compress_preserves_roots:
   using assms apply (cases "r = x") apply auto using rep_of_refl list_update_id by metis
 notation Ref.update ("_ := _" 62)
 
+lemma ancestors_step:
+  assumes "ufa_invar l" "i<length l" 
+  shows  "ancestors l i = {i} \<union> ancestors l (l!i)"
+  unfolding ancestors_def apply auto 
+  using converse_rtranclE' ufa_\<beta>_start_def apply force
+  by (metis assms(1) assms(2) path_to_parent trancl_into_rtrancl trancl_rtrancl_trancl ufa_\<beta>_def)
+
+  
+lemma path_from_child_is_path_from_parent:
+  assumes "ufa_invar l" "i<length l" "(i,x)\<in>(ufa_\<beta>_start l)\<^sup>*" "i\<noteq>x"
+  shows "(l!i,x)\<in>(ufa_\<beta>_start l)\<^sup>*"
+ apply (cases "l!i = x") apply auto[1]
+  apply (cases "i=l!i") using assms apply argo
+proof (rule ccontr, goal_cases)
+  case 1
+  have sg0: "(i,l!i)\<in> (ufa_\<beta>_start l)" unfolding ufa_\<beta>_start_def using assms 1
+     ufa_invarD(2)[OF assms(1,2)] by auto
+  have sg1: "x\<notin>ancestors l (l!i)" using 1 unfolding ancestors_def by blast
+  then have "x\<notin> ancestors l i" apply (subst ancestors_step[OF assms(1,2)])
+    using sg0 assms(3,4) 1(3) sg1 by blast
+  then have "(i,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" using 1 ancestors_step[OF assms(1,2)] 
+    unfolding ancestors_def by blast
+  then show ?case using assms by blast
+qed
+
+
 context 
   fixes x::nat and y::nat and l::"nat list"
   assumes x_edge_y: "(x,y)\<in> (ufa_\<beta>_start l)"
 begin \<comment>\<open>x_edge_y\<close>
-
-
 lemma compress_preserves_paths_out_of_y':
   assumes "ufa_invar l" "(v,w)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y,v)\<in>(ufa_\<beta>_start l)\<^sup>*" "(y, z) \<in> (ufa_\<beta>_start l)\<^sup>*"
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))\<^sup>*"
@@ -1661,7 +1649,151 @@ next
   then show ?case using step sg1 
     by (meson \<open>y0 \<noteq> x\<close> compress_preserves_other_edges converse_rtrancl_into_rtrancl)
 qed
+end
 
+no_notation Ref.update ("_ := _" 62)
+  
+lemma ufa_compress_generalized:
+  assumes I: "ufa_invar l"
+  assumes L[simp]: "x<length l" "z<length l"
+  assumes A: "(x,z)\<in> (ufa_\<beta>_start l)\<^sup>*"
+  shows "ufa_invar (l[x := z])" 
+proof -
+  {
+    fix i
+    assume C: "x\<noteq>z"
+    assume "i<length (l[x := z])"
+    hence IL: "i<length l" by simp
+    
+    have S: "rep_of_dom (l,z)" using I L unfolding ufa_invar_def by blast
+    have S1: "rep_of_dom (l,i)" using I IL unfolding ufa_invar_def by blast
+    have G1: "l[x := z] ! i < length (l[x := z])"
+      using I IL 
+      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
+    have S': "is_repr l i (rep_of l i)" using rep_of_is_repr S1 by blast
+    
+    have G2: "rep_of l i = rep_of (l[x:=z]) i \<and>rep_of_dom (l[x := z], i)"
+    proof (cases "(i,x)\<in>(ufa_\<beta>_start l)\<^sup>*")
+      case True
+      have "is_repr (l[x := z]) i (rep_of l i)" using S' A  True I L IL C proof induction
+        case (root l i)
+        hence "i = z" unfolding ufa_\<beta>_start_def 
+          by (smt Domain.intros Domain_Collect_case_prod mem_Collect_eq rtranclD trancl_domain)
+        from root have "i = x" unfolding ufa_\<beta>_start_def 
+          by (smt Domain.intros Domain_Collect_case_prod mem_Collect_eq rtranclD trancl_domain)
+        from root \<open>i=z\<close> \<open>i=x\<close> have "l[x:=z]!i=i" by (simp add: \<open>i = z\<close> nth_list_update')
+        then show ?case by (auto intro: is_repr.intros) 
+      next
+        case (child l i j)
+        then show ?case proof (cases "i=x")
+          case True
+          show ?thesis proof (cases "i=z")
+            case True
+            then show ?thesis using child(9) \<open>i=x\<close> by blast
+          next
+            case False
+            show ?thesis proof (rule is_repr_pathI, goal_cases)
+            case 1
+            have sg2: "(z,j) \<in> (ufa_\<beta>_start l)\<^sup>*" 
+              by (metis (no_types, hide_lams) True child.hyps child.prems(1,3,5,6) 
+                  rep_of_bound rep_of_idx rep_of_invar_along_path rep_of_is_repr rep_of_ufa_\<beta>_refl)
+             have sg3: "(z,j) \<in> (ufa_\<beta>_start (l[i:=z]))\<^sup>*" 
+               by (metis False True 
+                   Union_Find_Time_alpha_abstract_analysis.compress_preserves_paths_out_of_y' 
+                   child.prems(1,3) converse_rtranclE sg2)
+             show ?case apply (subst True[symmetric]) 
+               apply (rule  converse_rtrancl_into_rtrancl[OF _ sg3]) 
+               by (simp add: False child.prems(5) child.prems(6) ufa_\<beta>_start_def)
+          next
+            case 2
+            then show ?case 
+              by (metis aciclicity child.hyps child.prems(1,3,5,6) nth_list_update' rep_of_idx 
+                  rep_of_invar_along_path rep_of_is_repr rep_of_min rep_of_ufa_\<beta>_refl rtranclD 
+                  transitive_closure_trans(9) ufa_\<beta>_def)
+          qed
+          qed
+        next
+          case False
+          hence sg1: " (l ! i, x) \<in> (ufa_\<beta>_start l)\<^sup>*" using child 
+              path_from_child_is_path_from_parent by presburger
+          have sg2: "l[x := z]!i = l!i" using False child by fastforce
+          show ?thesis using child(2)[OF child(3) sg1 child(5-7) ufa_invarD(2)[OF child(5,8)]] sg2 C
+            by (auto intro: is_repr.intros)           
+        qed
+      qed
+      thus ?thesis using rep_of_is_repr by simp
+    next
+      case False
+      have "is_repr (l[x := z]) i (rep_of l i)" using S' A  False I L IL C proof induction
+        case (root l i)
+        then show ?case
+          by (metis is_repr.root nth_list_update_neq rtrancl.simps)
+      next
+        case (child l i j)
+        then show ?case
+          by (metis is_repr.child nth_list_update_neq path_to_parent rtrancl.simps 
+              trancl_into_rtrancl transitive_closure_trans(9) ufa_\<beta>_def ufa_invarD(2))
+      qed 
+      thus ?thesis using rep_of_is_repr by simp
+    qed
+    note IL G1 G2
+  } note G = this
+
+  {
+    fix i
+    assume "i<length (l[x := x])"
+    hence IL: "i<length l" by simp
+    
+    have S: "rep_of_dom (l,z)" using I L unfolding ufa_invar_def by blast
+    have S1: "rep_of_dom (l,i)" using I IL unfolding ufa_invar_def by blast
+
+    have G1: "l[x := x] ! i < length (l[x := x])"
+      using I IL 
+      by (auto dest: ufa_invarD[OF I] simp: nth_list_update rep_of_bound)
+
+    have S': "is_repr l i (rep_of l i)" using rep_of_is_repr S1 by blast
+    have G2: "rep_of (l[x:=x]) i = rep_of (l[x:=x]) i \<and>rep_of_dom (l[x := x], i)"
+    proof (cases "(i,x)\<in>(ufa_\<beta>_start l)\<^sup>*")
+      case True
+      have "is_repr (l[x := x]) i (rep_of (l[x := x]) i)" using S' A  True I L IL  proof induction
+        case (root l i)
+        then show ?case
+          by (metis is_repr.root nth_list_update' nth_list_update_eq rep_of_is_repr)
+      next
+        case (child l i j)
+        then show ?case 
+          by (metis nth_list_update_eq nth_list_update_neq path_from_child_is_path_from_parent 
+              rep_of.domintros rep_of_is_repr ufa_invarD(2))
+      qed
+      then show ?thesis using rep_of_is_repr by blast
+    next
+      case False
+      have "is_repr (l[x := x]) i (rep_of (l[x := x]) i)" using S' A  False I L IL  proof induction
+        case (root l i)
+        then show ?case 
+          by (metis is_repr.root nth_list_update' nth_list_update_eq rep_of_is_repr) 
+      next
+        case (child l i j)
+        then show ?case 
+          by (metis (no_types, lifting) nth_list_update_neq path_to_parent rep_of.domintros 
+              rep_of_is_repr rtrancl.simps trancl_into_rtrancl transitive_closure_trans(9) 
+              ufa_\<beta>_def ufa_invarD(2)) 
+      qed
+      then show ?thesis  using rep_of_is_repr by blast
+    qed
+
+    note IL G1 G2
+  }note H = this
+  show ?thesis using G H unfolding ufa_invar_def by blast
+qed
+
+notation Ref.update ("_ := _" 62)
+
+
+context 
+  fixes x::nat and y::nat and l::"nat list"
+  assumes x_edge_y: "(x,y)\<in> (ufa_\<beta>_start l)"
+begin \<comment>\<open>x_edge_y\<close>
 
 lemma compress_preserves_paths_to_roots':
   assumes "ufa_invar l" "(v,r)\<in>(ufa_\<beta>_start l)\<^sup>*" "r = l!r" "(y,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
@@ -1696,7 +1828,7 @@ next
         by (smt aciclicity assms(4) case_prodI mem_Collect_eq nth_list_update_eq 
             rtrancl_into_trancl2 sg2(1) step.prems(1) ufa_\<beta>_def ufa_\<beta>_start_def x_edge_y)
       using h3 rep_of_path_iff[OF assms(1) \<open>r<length l\<close> \<open>z<length l\<close>] 
-            assms(4) compress_preserves_paths_out_of_y' step.prems(1) by blast
+            assms(4) compress_preserves_paths_out_of_y'[OF x_edge_y] step.prems(1) by blast
   next
     case False
     then show ?thesis 
@@ -2846,28 +2978,65 @@ proof -
   show ?thesis using rep_of_path_iff assms pathcom rootcom path 
       ufa_compress_generalized[OF _ _ _ assms(6)] rep_of_bound  by force    
 qed
-  
 
-lemma compress_preserves_rep_of_weak:
-  assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
-          "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
-  shows "rep_of (l[x:=z]) y = rep_of l y"
+
+
+lemma compress_preserves_is_repr_weak_1:
+  assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" 
+          "is_repr l y r"
+  shows "is_repr (l[x:=z]) y r"
 proof -
   have "y\<noteq>x" using assms unfolding ufa_\<beta>_start_def by blast
-  show ?thesis using assms(1,3,2,4,5) \<open>y\<noteq>x\<close> proof (induction rule:rep_of_induct)
-    case (base i)
-    then show ?case using rep_of_refl by auto
+  show ?thesis using assms(6,1-5) \<open>y\<noteq>x\<close> proof induction
+    case (root l i)
+    then show ?case by (auto intro: is_repr.intros)
   next
-    case (step i)
-    have "ufa_invar (l[x := z])" using ufa_compress_generalized[OF assms(1,2,4,6)] .
-    then show ?case using rep_of_idx[OF assms(1) \<open>i<length l\<close>] 
-      using compress_preserves_rep_of_weak_converse step assms by blast
+    case (child l i j)
+    then show ?case 
+      by (smt compress_preserves_paths_weak is_repr_pathI nth_list_update_neq rep_of_idx 
+          rep_of_is_repr rep_of_min rep_of_ufa_\<beta>_refl)
   qed
 qed
 
+
+lemma compress_preserves_is_repr_weak_2:
+  assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" 
+          "is_repr (l[x:=z]) y r"
+        shows "is_repr l y r"
+proof -
+  have sg0: "y\<noteq>x" using assms unfolding ufa_\<beta>_start_def by blast
+  have sg1: "x<length (l[x:=z])" "y< length (l[x:=z])" "z<length (l[x:=z])" unfolding length_list_update
+    using assms by auto
+  have sg2: "(y,x) \<notin> (ufa_\<beta>_start (l[x:=z]))\<^sup>*" 
+    using assms(5) compress_preserves_paths_weak_converse by blast
+  obtain lc where abstr: "lc = l[x:=z]" by blast
+  have sg3: "l[x:=z] = lc" unfolding abstr ..
+  show ?thesis using assms(6) sg1 sg2 sg3 sg0 proof induction
+    case (root l i)
+    then show ?case unfolding abstr by (auto intro: is_repr.intros)
+  next
+    case (child l' i j)
+    hence "l'!i < length l'" unfolding abstr by (auto simp add: assms(1) ufa_invarD(2)) 
+    from child(6) have "(l' ! i, x) \<notin> (ufa_\<beta>_start l')\<^sup>*" unfolding ufa_\<beta>_start_def 
+      by (metis (mono_tags, lifting) \<open>l' ! i < length l'\<close> child.prems(2)
+          converse_rtrancl_into_rtrancl mem_Collect_eq old.prod.case)
+    hence "l'!i\<noteq>x" by blast
+    from child have "l'!i = l!i" unfolding abstr by (metis nth_list_update_neq)
+    then show ?case unfolding abstr 
+      using child(2)[OF \<open>x<length l'\<close> \<open>l'!i<length l'\<close> \<open>z<length l'\<close> 
+                    \<open>(l' ! i, x) \<notin> (ufa_\<beta>_start l')\<^sup>*\<close> \<open>l'=lc\<close> \<open>l'!i\<noteq>x\<close>]
+         by (auto simp: \<open>l'!i = l!i\<close> intro: is_repr.intros(2))
+  qed 
+qed
+
+lemma compress_preserves_rep_of_weak:
+  assumes "ufa_invar l" "x < length l" "y<length l" "z<length l" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*"
+  shows "rep_of (l[x:=z]) y = rep_of l y"
+  using assms compress_preserves_is_repr_weak_1 rep_of_is_repr ufa_invar_def by force
+
+
 lemma fw_ipc_compress_preliminary:
   assumes "fw_ipc l y i l'" "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "ufa_invar l" "x<length l" "z<length l" 
-          "(x,z)\<in>(ufa_\<beta>_start l)\<^sup>*"
   shows "fw_ipc (l[x := z]) y i (l'[x := z])"
   using assms proof (induction l y i l' rule: fw_ipc.induct)
   case base: (FWIPCBase y0 l)
@@ -2885,9 +3054,8 @@ next
   have sg3': "z'<length l" using step(1) unfolding ufa_\<beta>_start_def by blast
   have sg3'': "(z', x) \<notin> (ufa_\<beta>_start l)\<^sup>*" using step(1,4) 
     by (meson converse_rtrancl_into_rtrancl)
-  have sg3: "rep_of (l[x := z]) z' = rep_of l z' " using 
-      compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>  sg3' \<open>z<length l\<close> sg3''  step(8)] .
-  
+  have sg3: "rep_of (l[x := z]) z' = rep_of l z' " 
+    using compress_preserves_rep_of_weak[OF \<open>ufa_invar l\<close> \<open>x<length l\<close>  sg3' \<open>z<length l\<close> sg3'' ] .
   have IHfw_ipc: "fw_ipc (l[y := rep_of l z', x := z]) z' i (l'[x := z])" 
     apply (rule step(3))
     subgoal apply (rule ccontr)
@@ -2895,11 +3063,8 @@ next
     by (meson converse_rtrancl_into_rtrancl step.hyps(1))
   using rep_of_idx step assms ufa_compress_invar unfolding ufa_\<beta>_start_def 
      apply force 
-  subgoal using step(8) unfolding ufa_\<beta>_start_def length_list_update using step.prems(3) by blast
-  subgoal using step(8) unfolding ufa_\<beta>_start_def length_list_update using step.prems(4) by blast
-  subgoal using step.prems(3,4) step(8)  unfolding length_list_update ufa_\<beta>_start_def 
-    apply (cases "x = z") apply auto sorry
-   
+  subgoal using step(6) unfolding ufa_\<beta>_start_def length_list_update using step.prems(3) by blast
+  subgoal using step(7) unfolding ufa_\<beta>_start_def length_list_update using step.prems(4) by blast   
   done
   show ?case 
     apply (rule FWIPCStep)

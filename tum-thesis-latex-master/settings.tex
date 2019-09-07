@@ -38,8 +38,13 @@
 \newtheorem*{definition}{Definition}
 \usepackage{enumerate}
 \usepackage[hidelinks,final]{hyperref} % hidelinks removes colored boxes around references and links
+\usepackage{ifthen}
+\usepackage{bbding}
+\usepackage{fancyvrb}
+\usepackage{bera}
 
- \usepackage{ifthen}
+\setlength{\parindent}{0em}
+\setlength{\parskip}{0.8em}
 
 \newcommand{\DefineSnippet}[2]{%
 	\expandafter\newcommand\csname snippet--#1\endcsname{%
