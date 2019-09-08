@@ -2,6 +2,7 @@
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{textcomp}
 \usepackage[sc]{mathpazo}
 \usepackage[ngerman,american]{babel}
 \usepackage[autostyle]{csquotes}
@@ -27,6 +28,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{mathdots}
 \usepackage{isabelle}
 \usepackage{alltt}
 \usepackage{bussproofs}
@@ -42,6 +44,15 @@
 \usepackage{bbding}
 \usepackage{fancyvrb}
 \usepackage{bera}
+%\usepackage[scaled=0.85]{beramono}
+
+\lstset{emph={%  
+		definition,where,do,return,if,then,else,partial_function,let,type_synonym
+	},emphstyle={\bfseries}%
+}%
+
+\lstset{numbers=left, numberstyle=\footnotesize, numbersep=5pt}
+
 
 \setlength{\parindent}{0em}
 \setlength{\parskip}{0.8em}
@@ -69,7 +80,9 @@
 \newcommand{\level}{\mathrm{level}_{\LL,\RR}\,}
 \newcommand{\iindex}{\mathrm{index}_{\LL,\RR}\,}
 \newcommand{\philr}{\phi\, \LL\, \RR\,}
+\newcommand{\philrb}{\phi\, \LL\, \RR}
 \newcommand{\Philr}{\Phi\, \LL\, \RR\,}
+\newcommand{\Philrb}{\Phi\, \LL\, \RR}
 \newcommand{\ufaunion}{\mathrm{ufa\_union}_\LL\,}
 \newcommand{\ufaunionl}{\mathrm{union\_by\_rank^{(\LL)}_{\LL,\RR}}\,}
 \newcommand{\ufaunionrkl}{\mathrm{union\_by\_rank^{(\RR)}_{\LL,\RR}}\,}
@@ -148,7 +161,8 @@ letria/.style={
 
 \pgfdeclarelayer{background}
 \pgfdeclarelayer{foreground}
-\pgfsetlayers{background,main,foreground}
+\pgfdeclarelayer{legend}
+\pgfsetlayers{background,main,foreground,legend}
 
 % Define block styles  
 \tikzstyle{materia}=[draw, fill=TUMAccentLightBlue, text width=6.0em, text centered,
@@ -202,6 +216,19 @@ minimum height=3em, rounded corners]
 		\path (#3.east |- #4.south)+(+0.5,-0.25) node (a2) {};
 		% Draw the background
 		\path[fill=white,rounded corners, draw=black!50, dashed]
+		(a1) rectangle (a2);
+		\path (a1.east |- a1.south)+(0.8,0.2) node (u1)[texto]
+		{\normalsize\textit{#5}};
+\end{pgfonlayer}}
+
+\newcommand{\legend}[5]{%
+	\begin{pgfonlayer}{legend}
+		% Left-top corner of the background rectangle
+		\path (#1.west |- #2.north)+(-0.5,0.5) node (a1) {};
+		% Right-bottom corner of the background rectanle
+		\path (#3.east |- #4.south)+(+0.5,-0.25) node (a2) {};
+		% Draw the background
+		\path[fill=white, draw=black!50]
 		(a1) rectangle (a2);
 		\path (a1.east |- a1.south)+(0.8,0.2) node (u1)[texto]
 		{\normalsize\textit{#5}};
