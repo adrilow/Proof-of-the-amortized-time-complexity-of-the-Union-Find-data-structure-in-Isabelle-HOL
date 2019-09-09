@@ -2,7 +2,7 @@
 
 For a detailed explanation of the project, as well as the presented theories, see the writeup in ./tum-thesis-latex-master which contains its own README for building the pdf.
 
-##Usage
+## Usage
 
 These theories have been tested with [Isabelle2018], although the use in more recent versions should be possible.
 
@@ -10,9 +10,9 @@ The files InverseNatNat.thy and Ackermann.thy only need a regular Isabelle2018 s
 
 The rest of the theories build upon [Sepreftime], you will need to succesfully set up that project first, and then place this repository as its own directory inside /Sepreftime/Examples.
 
-##License
+## License
 
-###For the files in the folder ./tum-thesis-latex-master:
+### For the files in the folder ./tum-thesis-latex-master:
 
 These are distributed under the [Creative Commons Attribution-ShareAlike 4.0 International License][license], meaning that:
 
@@ -25,11 +25,11 @@ The license **applies only to the template**.
 * The resulting PDF file and the contents of the thesis are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License][license] for which the original author is Adrián Löwenberg Casas and the link to the original work is this repository.
 
 
-###For the theories Ackermann.thy and InverseNatNat.thy:
+### For the theories Ackermann.thy and InverseNatNat.thy:
 
 These works are original work by Adrián Löwenberg Casas distributed under the [2-clause-BSD] license, see LICENSE.md.
 
-###For the rest of the theories:
+### For the rest of the theories:
 
 These are derived work from the work by M. P.L. Haslbeck and Peter Lammich found in [Sepreftime], and are distributed further under the [2-clause-BSD] license, see LICENSE.md.
 
