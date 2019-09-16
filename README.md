@@ -1,6 +1,6 @@
 # Bachelor Thesis: Proof of the amortized time complexity of an efficient implementation of the Union-Find data structure in Isabelle/HOL
 
-For a detailed explanation of the project, as well as the presented theories, see the writeup in ./tum-thesis-latex-master which contains its own README for building the pdf.
+For a detailed explanation of the project, as well as the presented theories, see the writeup in ./tum-thesis-latex-master which contains its own README for building the pdf, or the already compiled submitted version of the thesis.
 
 ## Usage
 

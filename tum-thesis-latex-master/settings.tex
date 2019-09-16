@@ -43,8 +43,11 @@
 \usepackage{ifthen}
 \usepackage{bbding}
 \usepackage{fancyvrb}
+\usepackage{ragged2e}
+\usepackage{microtype}
 \usepackage{bera}
 %\usepackage[scaled=0.85]{beramono}
+
 
 \lstset{emph={%  
 		definition,where,do,return,if,then,else,partial_function,let,type_synonym
@@ -52,6 +55,10 @@
 }%
 
 \lstset{numbers=left, numberstyle=\footnotesize, numbersep=5pt}
+
+
+\setlength{\CenteringLeftskip}{0pt plus 0.5em}
+\setlength{\CenteringRightskip}{0pt plus 0.5em}
 
 
 \setlength{\parindent}{0em}
@@ -89,6 +96,10 @@
 \newcommand{\toppart}{\mathrm{top\_part}_{\LL,\RR}\,}
 \newcommand{\pleasant}{\mathrm{pleasant}_{\LL,\RR}\,}
 \newcommand{\displeasure}{\mathrm{displeasure}_{\LL,\RR}\,}
+
+\makeatletter
+\newcommand{\eqnum}{\refstepcounter{equation}\textup{\tagform@{\theequation}}}
+\makeatother
 
 \bibliography{bibliography}
 
