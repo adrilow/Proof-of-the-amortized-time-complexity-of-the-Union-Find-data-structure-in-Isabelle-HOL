@@ -1,0 +1,1305 @@
+\RequirePackage[l2tabu,orthodox]{nag}
+
+% TODO: decide if one-sided/two-sided
+%\documentclass[headsepline,footsepline,footinclude=false,fontsize=11pt,paper=a4,listof=totoc,bibliography=totoc,BCOR=12mm,DIV=12]{scrbook} % two-sided
+\documentclass[headsepline,footsepline,footinclude=false,oneside,fontsize=11pt,paper=a4,listof=totoc,bibliography=totoc]{scrbook} % one-sided
+
+% TODO: change citation style in settings
+\input{settings}
+
+% TODO: change thesis information
+\newcommand*{\getUniversity}{Technische Universität München}
+\newcommand*{\getFaculty}{Department of Informatics}
+\newcommand*{\getTitle}{\textls*[+13]{Proof of the Amortized Time Complexity} \textls*[-11]{of an Efficient Union-Find Data Structure} in Isabelle/HOL\par}
+\newcommand*{\getTitleGer}{Beweis der amortisierten Laufzeit einer effizienten Union-Find-Datenstruktur in Isabelle/HOL\par}
+\newcommand*{\getAuthor}{Adrián Löwenberg Casas}
+\newcommand*{\getDoctype}{Bachelor's Thesis in Informatics}
+\newcommand*{\getSupervisor}{Prof. Tobias Nipkow, Ph.D.}
+\newcommand*{\getAdvisor}{Maximilian P.L. Haslbeck, M.Sc.}
+\newcommand*{\getSubmissionDate}{September 16th, 2019}
+\newcommand*{\getSubmissionLocation}{Munich}
+
+\begin{document}
+
+% Set page numbering to avoid "destination with the same identifier has been already used" warning for cover page.
+% (see https://en.wikibooks.org/wiki/LaTeX/Hyperlinks#Problems_with_Links_and_Pages).
+\pagenumbering{alph}
+\input{pages/cover}
+
+\frontmatter{}
+
+\input{pages/title}
+\input{pages/disclaimer}
+\input{pages/acknowledgments}
+\input{pages/abstract}
+\microtypesetup{protrusion=false}
+\tableofcontents{}
+\microtypesetup{protrusion=true}
+
+\mainmatter{}
+
+%\input{chapters/01_introduction}
+% TODO: add more chapters here
+
+\chapter{Introduction}
+
+One of the main subjects of computer science is the study of algorithms and data structures. When a new algorithmic idea is developed two problems arise, firstly if the algorithm solves the problem \textit{(functional correctness)} and secondly whether the running time is always reasonable \textit{(worst-case running time analysis)} for every operation, or for a sequence of operations \textit{(amortized running time analysis)}. In this thesis we provide computer assisted formal proofs of both properties for the Union-Find data structure. 
+
+In the first chapter we present the data structure abstractly and our implementation of it. In the second chapter we introduce the Ackermann function, its properties and those of its inverse, which is asymptotically the amortized running time for the operations provided by the data structure. Finally, we outline the proof of the functional correctness and amortized time complexity of the data structure developed in Isabelle/HOL and explain the significance of the main results.
+
+\section{Union-Find and Partial Equivalence Relations}
+
+The Union-Find data structure mathematically models a partial equivalence relation over a finite domain. This is implemented efficiently by disjoint set forests, which are forests of rooted trees, each tree representing an equivalence class, with every node being an element and the root a representative of the equivalence class.
+Classically, the operations supported are \textit{Union}, where two equivalence classes are merged into one, and \textit{Find}, where it is checked whether two given elements belong to the same class.
+
+In our implementation, we represent the disjoint set forest by an array representing the child-parent relationship, every index in the array represents a node, and the content of the array at that index is the parent of the node. A root node is modeled as having itself as a parent.
+
+Note that this approach requires every node to be just a number, when in practice a user of the data structure might want to store arbitrary data in it. This is however easily solvable by the user by associating the index of the node with the data required by the use case, which does not need to be stored in the array.
+
+Additionally, we use another array of the same length to store the \textit{ranks} of the nodes, its significance will reveal itself during the running time analysis. 
+
+
+
+\begin{figure}[!htb]
+	\centering
+	\begin{tikzpicture}[<-,level/.style={sibling distance = 5cm/#1,
+			level distance = 1.5cm}] 
+		\node (root)[first] {} 
+			child{ node (leftchild) [dsf1] {$0$} 
+				child{ node [dsf1] {$2$}} 
+				child{ node [dsf1] {$3$}
+					child{ node [dsf1] {$4$}}
+				}
+			}
+			child{ node (rightchild) [dsf2] {$1$}
+				child{ node [dsf2] {$5$}
+					child{ node [dsf2] {$6$}}
+				}
+			}                            
+		; 
+		\path (leftchild) edge [loop above] node {} (leftchild);
+		\path (rightchild) edge [loop above] node {} (rightchild);
+		\path [-{Latex[width=1cm]}, shorten >=-2mm] (rightchild) edge[white, ultra thick] node {} (root);
+		\path [-{Latex[width=1cm]}, shorten >=-2mm] (leftchild) edge[white, ultra thick] node {} (root);
+		\end{tikzpicture}
+		
+		\begin{tikzpicture}[box/.style={rectangle,draw=black, minimum size=1cm}]
+		
+		\foreach \y [count=\x] in {0,1,0,0,3,1,5}{
+			
+			\ifthenelse{\x=2 \OR \x=6 \OR \x=7}
+			{\node[box, fill=TUMAccentOrange] at (\x-1,0){\y};}
+			{\node[box, fill=TUMAccentLightBlue] at (\x-1,0){\y};}
+			
+			\node at (\x-1,-1){			\pgfmathparse{\x-1}\pgfmathprintnumber{\pgfmathresult}};
+			\ifthenelse{\x=1 \OR \x=2}
+			{}
+			{\draw[->] (\x-1,0.5) .. controls (\y+0.25\x-0.25\y+0.75, 1.5) and (\y+0.75\x-0.75\y+0.25, 1.5) .. (\y,0.5);}
+		}
+		
+		\node at (-2,0) {Array:};	
+		\node at (-2,-1) {Indexes:};
+		
+		
+		\end{tikzpicture}
+		\caption{Two equivalence classes and their representation as a disjoint set forest.}
+\end{figure}
+
+
+Using arrays is arguably more efficient than a pointer-based implementation. Of course, this fixes the domain size to the length of the array at the moment of instantiating the data structure. This restriction could easily be removed by using a dynamic array instead. If its operations occur in amortized constant time, the resulting amortized time of the \textit{Union} and \textit{Find} operations is the same. We will try to give hints to where adjustments would need to be made to the mathematical analysis to accommodate the varying domain. This and other ideas for future work will be marked by \HandPencilLeft. 
+
+\subsection{Path Compression and Union by Rank}
+
+The efficiency of this implementation relies on two heuristics that dramatically improve running time. Very roughly, as with any data structure involving trees, we want to keep the trees as flat as possible, to minimize the number of iterations to the root.
+
+\begin{itemize}
+	\item \textbf{Union by rank}: When merging two trees, in order for the resulting tree to be as flat as possible, the root of the tree with more nodes should be the new root. It is possible to keep track of the size of every tree, as did Lammich \cite{Lam19} in his implementation, and according to Tarjan et al. \cite{Tarjan84} the resulting time complexity would be the same, however we follow Charguéraud and Pottier \cite{chargueraud17} and use the \textit{rank} approximation, which is an upper bound on the size of the tree.
+	On initialization, every node is a childless root and has a rank of zero. When merging two trees, the root of the tree with the largest rank becomes the new root and its rank is incremented by one.
+	\item \textbf{Path compression}: Every time the representative of a node is searched for, an iteration from said node to the root is performed. To achieve a flatter tree, the path is compressed, this means that every node visited during the iteration is updated to have the root as its parent. This is without penalty to the running time of the original representative search operation. Every subsequent iteration to the root from any updated node is therefore only one step.
+	
+	
+	\begin{figure}[!htb]
+		\centering
+		\begin{tikzpicture}[<-,level/.style={sibling distance = 5cm/#1,
+			level distance = 1.5cm}] 
+		\node (root)[first] {} 
+		child{ 
+			node (leftchild) [dsf1] {$0$} 
+			child{ 
+				{ node[itria] {\,\,\,\,\,\,} }
+				node [dsf1] {$1$}
+				child{ 
+					{ node[itria] {\,\,\,\,\,\,} }
+					node [dsf1] {$2$} 
+					child{ node [dsf1] {$3$} { node[itria] {\,\,\,\,\,\,} } }
+					child[missing] child[missing]
+				} child[missing] child[missing]
+			} child[missing] child[missing]
+		} 
+		child{ 
+			node (rightchild) [dsf1] {$0$}
+			child{ { node[itria] {\,\,\,\,\,\,} } node [dsf1] {$1$}}
+			child{ { node[itria] {\,\,\,\,\,\,} } node [dsf1] {$2$}}
+			child{ { node[itria] {\,\,\,\,\,\,} } node [dsf1] {$3$}}
+		}                            
+		; 
+		\path (leftchild) edge [loop above] node {} (leftchild);
+		\path (rightchild) edge [loop above] node {} (rightchild);
+		\path [-{Latex[width=1cm]}, shorten >=-2mm] (rightchild) edge[white, ultra thick] node {} (root);
+		\path [-{Latex[width=1cm]}, shorten >=-2mm] (leftchild) edge[white, ultra thick] node {} (root);
+		\end{tikzpicture}
+		\caption{The state before and after performing path compression at the node $3$.}
+	\end{figure}
+\end{itemize}
+
+\subsection{Implementation}
+
+Our implementation is based on the one by Lammich, for which Haslbeck and Lammich provided a non-optimal amortized time complexity bound \cite{HaslRef19}. This implementation did not compress on \textit{Union}, so its running time could not be optimal\label{bug}. The code has been adapted to use ranks and to compress on every occasion. The data structure is represented by two arrays, the disjoint set forest and the rank array, and such is the implementation in Imperative/HOL:
+
+\begin{lstlisting}[mathescape=true,caption=The Datatype Representing the Data Structure,captionpos=b, label={The Datatype Representing the Data Structure}]
+	type_synonym uf = nat array $\times$ nat array
+\end{lstlisting}
+\subsubsection{Initialization}
+
+On initialization the size of the arrays has to be fixed, so it is provided as a parameter to \verb|uf_init|:
+
+\begin{lstlisting}[mathescape=true,caption=The Initialisation Function,captionpos=b,label={The Initialisation Function}]
+	definition uf_init :: nat $\Rightarrow$ uf Heap where
+	uf_init n $\equiv$ do {
+		l $\leftarrow$ Array.of_list [0..<n];
+		szl $\leftarrow$ Array.new n (0::nat);
+		return (szl,l)
+	}
+\end{lstlisting}
+
+\vspace{-0.6cm}
+
+\subsubsection{Find}
+
+The \textit{Find} operation, or \verb|uf_cmp|, is implemented here in a modular way, which eases the correctness proof and the running time analysis. The usual implementations in the literature, prominently in CLRS \cite{CLRS09} and also the one by Charguéraud and Pottier \cite{chargueraud17} use an arguably more natural pointer structure to represent the forest, search for a representative recursively, and do the path compression on backtracking. Our implementation relies on the \verb|uf_rep_of_c| function, which searches for the representative first (\verb|uf_rep_of|), and on a second pass, it compresses the equivalence class (\verb|uf_compress|). The \verb|uf_cmp| function retrieves both representatives and returns whether they are equal.
+\vspace{2cm}
+
+\begin{lstlisting}[mathescape=true,caption=The Representative Search Function,captionpos=b]
+	partial_function (heap) uf_rep_of :: nat array $\Rightarrow$ nat $\Rightarrow$ nat Heap
+	where [code]: 
+	uf_rep_of p i = do {
+		n $\leftarrow$ Array.nth p i;
+		if n=i then return i else uf_rep_of p n
+	}
+\end{lstlisting}
+\vspace{-0.2cm}
+\begin{lstlisting}[mathescape=true,caption=The Iterated Path Compression Function,captionpos=b]
+	partial_function (heap) uf_compress :: nat $\Rightarrow$ nat $\Rightarrow$ nat array $\Rightarrow$ unit Heap
+	where [code]: 
+	uf_compress i ci p = (
+		if i=ci then return ()
+		else do {
+			ni $\leftarrow$ Array.nth p i;
+			uf_compress ni ci p;
+			Array.upd i ci p;
+			return ()
+	})
+\end{lstlisting}
+\vspace{-0.2cm}
+\begin{lstlisting}[mathescape=true,caption=The Representative Search and Compression Function,captionpos=b]	
+	definition uf_rep_of_c :: nat array $\Rightarrow$ nat $\Rightarrow$ nat Heap where 
+	uf_rep_of_c p i $\equiv$ do {
+		ci $\leftarrow$ uf_rep_of p i;
+		uf_compress i ci p;
+		return ci
+	}
+\end{lstlisting}
+\vspace{-0.2cm}
+\begin{lstlisting}[mathescape=true,caption=The Find Operation,captionpos=b]	
+	definition uf_cmp :: uf $\Rightarrow$ nat $\Rightarrow$ nat $\Rightarrow$ bool Heap where
+	uf_cmp u i j $\equiv$ do {
+		let (s,p) = u;
+		n $\leftarrow$ Array.len p;
+		if (i$\geq$n $\lor$ j$\geq$n) then return False
+		else do {
+			ci $\leftarrow$ uf_rep_of_c p i;
+			cj $\leftarrow$ uf_rep_of_c p j;
+			return (ci=cj)
+		}
+	}
+\end{lstlisting}
+
+\subsubsection{Union}
+The \textit{Union} operation, here \verb|uf_union|, also makes use of the \verb|uf_rep_of_c| function, as it needs to find the roots of the trees representing the equivalence classes of its arguments to merge them. Beginning in line \ref{line:reps} of the \verb|uf_union| code, the ranks of the roots are retrieved, and then the root with the highest rank becomes the new root and its rank is incremented.
+
+
+\begin{lstlisting}[mathescape=true, caption=The Union Operation,captionpos=b,escapechar=|]	
+	definition uf_union :: uf $\Rightarrow$ nat $\Rightarrow$ nat $\Rightarrow$ uf Heap where 
+	uf_union u i j $\equiv$ do {
+		let (r,p) = u;
+		ci $\leftarrow$ uf_rep_of_c p i;
+		cj $\leftarrow$ uf_rep_of_c p j;
+		if (ci=cj) then return (r,p) 
+		else do {
+			ri $\leftarrow$ Array.nth r ci; |\label{line:reps}|
+			rj $\leftarrow$ Array.nth r cj;
+			if ri<rj then do {
+				Array.upd ci cj p;
+				(if (ri=rj) then do {
+					Array.upd cj (ri+1) r
+				} else return r);
+				return (r,p)
+			} else do { 
+				Array.upd cj ci p;
+				if (ri=rj) then do {
+					Array.upd ci (ri+1) r;
+					return (r,p)
+				} else return (r,p)
+			}
+		}
+	}
+\end{lstlisting}
+
+\section{Applications}
+
+The Union-Find data structure is important and used in several foundational algorithms, as equivalence relations are a very flexible modeling tool. An equivalence relation can represent the partition of a set, for example the connected components of an undirected graph. The Union-Find data structure can be used for example in an efficient implementation of the Kruskal algorithm to check if two vertices are connected or whether a cycle is created when adding an edge. 
+The earlier version of Union-Find implemented in Imperative/HOL is used by Haslbeck et al. to implement Kruskal \cite{Kruskal-AFP}. The version presented here is a drop-in replacement which automatically would improve the time complexity of the whole algorithm (see \ref{bug}). Another important application is an efficient implementation of Huet's algorithm for unification \cite{Knight89}.
+
+
+
+\chapter{The Ackermann Function}
+
+In this chapter we define the Ackermann function exactly as Charguéraud and Pottier \cite{chargueraud17}, who follow the definition by Alstrup et al. \cite{Alstrup14} and, more clasically, by Tarjan \cite{Tarjan1975b}. We then prove some important properties about it, including monotonicity in every argument and under iteration.
+The theory Ackermann.thy can be used together with InverseNatNat.thy completely independently from the rest of the theories presented in this thesis.
+
+\section{Relationship to other Ackermann Function Definitions}
+
+It is important to note that there are several definitions of the Ackermann function in the literature. The definition already existing in Isabelle (HOL/ex/Primrec.thy) follows Mendelson \cite[pg. 345]{Mendelson09}, which in turn follows the classical definition by Ackermann \cite{Ackermann22}. All three of these occurrences focus on the property of this function not being primitive recursive.
+
+The definition by Charguéraud and Pottier follows Tarjan, who states it is a ``slight variant of Ackermann's function; it is not primitive recursive'' \cite{Tarjan1975b}. The reasons for this variation are not clear to us, and the statement about it not being primitive recursive seems to not have been proved, but it rather probably follows from the fundamentally similar definitions.
+However, this property is of no interest for the purpose of this thesis except for the qualitative statement that a function growing faster than every primitive recursive function is \textit{very} fast-growing, so its inverse is \textit{very} slow-growing.
+
+\section{Definition}
+
+The definition by Charguéraud and Pottier is modular, and enables proving the properties of the Ackermann function through properties about simpler functions.
+
+
+\begin{definition}{Ackermann}
+	\begin{align}
+	\mathrm{astep} \, f \, x &:= f^{(x+1)} \, x \\
+	A \, k \, n &:= (\mathrm{astep}^{(k)} \, \mathrm{Suc}) \, n
+	\end{align}
+	$A$ is the Ackermann function, and it satisfies the following alternative equation, unfolding all definitions:
+	\begin{equation}
+	A \, k \, n = ((\lambda \, f \, x. \, f ^ {(x + 1)}\, x) ^ {(k)} \, \mathrm{Suc}) \, n
+	\end{equation}
+	The notation $f ^{(n)} \, x$ corresponds to Isabelle's $(f \, \textasciicircum \textasciicircum \, n) \, x$ and refers to function iteration:
+	\begin{equation}
+	f^{(n)} \, x := \begin{cases}
+					x \quad \quad \quad \quad \quad \, \, n = 0 \\
+					f^{(n-1)} \, (f \, x) \quad n > 0
+					\end{cases}
+	\end{equation}
+	And $\mathrm{Suc}$ is, for the purposes of this thesis, just $\mathrm{Suc}\,x := x + 1$.
+\end{definition}
+
+The definition abstracts the recursion inherent to the Ackermann function and thus enables the use of the existing lemmas about function iteration, in particular the powerful \textit{funpow\_mono2} (see \ref{funpow}). Of course, this definition corresponds to the equations by Tarjan:
+
+\begin{lemma}{Tarjan characteristic equations}
+	\begin{align}
+	A \, 0 \, x &= x + 1 \quad \quad \quad \quad \text{Ackermann\_base\_eq} \\
+	A \, (k + 1)\, x &= (A\, k)^{(x + 1)}\, x \quad \text{Ackermann\_step\_eq}
+	\end{align}
+\end{lemma}
+
+\section{Explicit Equations and Bounds}
+
+The Ackermann function satisfies the following explicit equations for the first values of $k$, which gives an idea of how fast the function grows:
+
+\begin{lemma}{Ackermann\_1\_eq}
+	\begin{equation}
+	A \, 1 \, x = 2x + 1
+	\end{equation}
+\end{lemma}
+
+\begin{lemma}{Ackermann\_2\_eq}
+	\begin{equation}
+	A \, 2 \, x = 2^{x+1} (x + 1) - 1
+	\end{equation}
+\end{lemma}
+
+It also fulfills the following lower bound for $A\,2$:
+
+\begin{lemma}{Ackermann\_2\_log\_lower\_bound}
+	\begin{equation}
+		n \leq A \, 2 \, (\log{n})
+	\end{equation}
+	Where $\log$ is the discrete binary logarithm as defined in the Isabelle/HOL distribution (HOL-Library.Discrete).
+\end{lemma}
+
+As well as the following, already impressive, lower bound for $A\,3$:
+
+\begin{lemma}{Ackermann\_3\_lower\_bound}
+	\begin{equation}
+	\underbrace{2^{2^{\iddots^{2}}}}_{x \text{times}} \leq A \, 3 \, x
+	\end{equation}
+\end{lemma}
+
+Or, more formally: $((\textasciicircum) \, 2) ^ {(x + 1)} \, 0 \leq A \, 3 \, x$
+
+
+\section{Further Contributions in this Theory}
+
+There are some more properties of the Ackermann function which have been generalized and proved for
+general iterated functions, as well as many technical lemmas which enable for more direct proofs about monotonicity and inflationarity of iterated functions.
+A very useful lemma which already existed in the Nat.thy theory was \textit{funpow\_mono2}, which states:
+\begin{lemma}{funpow\_mono2} \newline \label{funpow}
+	\textbf{Assume:} mono $f$; $i \leq j$; $x \leq y$; $x \leq f \, x$
+	\begin{equation}
+	f ^{(i)} \, x \leq f ^ {(j)} \, y
+	\end{equation}
+\end{lemma}
+
+We provided among others the following lemmas, which extend this lemma to the comparison of two functions, under some assumptions about the relationship between them:
+
+\begin{lemma}{compow\_mono\_in\_f} \newline
+	\textbf{Assume:} mono $f$; mono $g$; $\forall x. f \, x \leq g \, x$
+	\begin{equation}
+	f ^{(i)} \, x \leq g ^ {(i)} \, x
+	\end{equation}
+\end{lemma}
+
+\begin{lemma}{compow\_mono\_in\_f\_and\_i'} \newline
+	\textbf{Assume:} mono $f$; mono $g$; inflationary $g$;
+	$\forall x\, y.\, x \leq y \rightarrow f\, x \leq g\, y$; $x \leq y$; $i \leq j$
+	\begin{equation}
+	f ^{(i)} \, x \leq g ^ {(j)} \, y
+	\end{equation}
+\end{lemma}
+
+We also proved some properties about the asymptotics of the Ackermann function, which of course goes to infinity as any variable grows, which are proved following some more general lemmas about asymptotics of iterated strictly inflationary functions.
+
+\section{Inverses of Functions between Natural Numbers}
+
+In this section we present two notions of inverses for functions $f: \mathrm{nat} \Rightarrow \mathrm{nat}$. To our knowledge, this notation was introduced by Chargeraud et al. \cite{chargueraud17} to modularize the definition of the inverse Ackermann function, as well as to ease some proofs by providing lemmas to change the proof obligations in both directions between a function and its inverse.
+In Isabelle/HOL, this theory provides a locale which specifies the requirements to the function. For the sake of simplicity we require the function to be strictly monotonic and to tend to infinity. Many of the lemmas, as well as the definition itself, only require monotonicity. Without the asymptotic condition however, one cannot prove the existence of the inverse at every point.
+
+This theory can be useful independently of the current context of the inverse Ackermann function. Some important concepts in the abstract analysis of the Union-Find data structure which are not directly inverses of the Ackermann function are defined using $\alpha_f$ and $\beta_f$, as this provides many useful lemmas.
+
+\subsection{Definitions}
+
+\begin{definition}{Upper inverse}
+	\begin{equation}
+	\alpha_f \, y := \min\{x \, \mid \, y \le f\, x\}
+	\end{equation}
+	$\alpha_f\, y$ is therefore the smallest $x$ for which $y \le f\, x$ holds. As the function is monotonic, this holds for all further $x$, so $y \le f\, x$ is equivalent to $\alpha_f \,y \le f\,x$, which makes $\alpha_f$ an upper inverse of $f$.
+\end{definition}
+
+\begin{definition}{Lower inverse}
+	\begin{equation}
+	\beta_f \, y := \max\{x \, \mid \, f\,x \le y \}
+	\end{equation}
+	Here the existence is not guaranteed, as $f$ may start above $y$, so we need to require $f\,0 \le y$. If we have a $\beta_f\,y$, then it is the largest $x$, for which $f\,x\le y$ holds. By monotonicity the property holds for all smaller $x$. Therefore $f\,x \le y$ is equivalent to $x \le \beta_f\,y$, which makes $\beta_f$ a lower inverse of $f$.
+\end{definition}
+
+This functions of course differ by at most one, and coincide if $y$ is the image under $f$ of some $x$. In Isabelle, they are defined by the \textit{Least} and \textit{Greatest} operators, and the existence is shown in separate lemmas. 
+
+Important lemmas that always apply to these functions are monotonicity and that they tend to infinity (this is of course important for the inverse Ackermann function).
+
+\begin{figure}
+	\centering
+	\resizebox{\columnwidth}{!}{%
+	\begin{tikzpicture}
+	\begin{axis}
+	[
+	domain=0:8,
+	restrict y to domain=0:8,
+	samples=200,
+	xlabel=$x$,
+	ylabel=$y$, 
+	xmajorgrids=true,
+	xtick distance = 1,
+	axis lines=middle,
+	ticklabel style={font=\tiny,fill=white},
+	legend pos=north east,
+	legend style={font=\tiny},
+	legend style={at={(0.9,0.05)},anchor=south east}
+	]
+	\addplot [color=TUMAccentGreen,thick]  {x^(1.3)};
+	\addplot [color=TUMGray] {x^(0.7692)}; 
+	\addplot [color=TUMDarkGray,thick, forget plot] {x};
+	\addplot [color=TUMAccentOrange] coordinates {
+		(0.0, 0.0)
+(0.01, 1.0)
+(1.0, 1.0)
+(1.0, 2.0)
+(2.46, 2.0)
+		(2.46, 3.0)
+(4.17, 3.0)
+(4.17, 4.0)
+(6.06, 4.0)
+(6.06, 5.0)
+		(8.0, 5.0)
+	};
+	\addplot [color=TUMBlue] coordinates {
+	(0.0, 0.0) (1.0, 0.0)
+(1.0, 1.0)
+(2.46, 1.0)
+(2.46, 2.0)
+	(4.17, 2.0)
+(4.17, 3.0)
+(6.06, 3.0)
+(6.06, 4.0)	(8.0, 4.0)
+	};
+	\legend{$f$,$f^{-1}$,$\alpha_f$,$\beta_f$}
+	\end{axis}
+	\end{tikzpicture}
+}
+\caption{Visualization of $\alpha_f$ and $\beta_f$ and their relationship to an exact real inverse.}
+\caption*{Only the integer points are defined in our case.}
+\end{figure}
+
+\section{Inverse Ackermann Function}
+\label{sec:inverseackermann}
+\subsection{Historical Definitions}
+
+The name $\alpha_f$ suggestively relates to the historical definition of $\alpha$ as the ``functional inverse'' of the Ackermann function \cite{Tarjan1975b}. According to the Nist \cite{dadsalpha} which is the most canonical source we could find the function is defined as: \begin{equation}
+\alpha\,m\,n := \min\{k \geq 1 \, \mid \, A\, k\, \left \lfloor {m/n} \right \rfloor > \log{n} \} 
+\end{equation}
+Another important source is Nivasch's Ph.D. thesis \cite{navasch09}, which uses the inverse Ackermann function for a lower bound in computational geometry. The definition is very similar to ours, albeit with rather differing notation, but with very similar bounds and same asymptotic behavior. There is also a section dedicated more thoroughly to the different versions of $A$ and $\alpha$ in the literature.
+
+\subsection{Definition}
+We naturally want to use our theory about inverses of natural functions to define $\alpha$, as did Charguéraud and Pottier We define two versions of the function, one would be the more natural single argument version of the inverse and the other follows Alstrup et al. \cite{Alstrup14} and adds a parameter.
+
+\begin{definition}{Inverse Ackermann function}
+	\begin{equation}
+	\alpha \, n := \alpha_{\lambda k.\, A\, k\, 1} \, n
+	\end{equation}
+	Which unfolded yields:
+	\begin{equation}
+	\alpha \, n = \min \{ k \,\mid\, A\, k\, 1 \geq n \}
+	\end{equation}
+\end{definition}
+
+This is exactly the definition given in CLRS \cite[pg. 574]{CLRS09}. The choice of the constant 1 seems arbitrary, but fixing the second argument of $A$ does not change much, as the first one makes the function more powerful as it grows. Following Alstrup et al. we also define a version of $\alpha$ for an arbitrary parameter as a second argument to $A$:
+
+\begin{definition}{Parametrized inverse}
+\begin{equation}
+	\alpha_r \, n := 1 + \alpha_{\lambda k.\, A\, k\, r} \, (n + 1) \label{alphar}
+\end{equation}
+Which unfolded yields:
+\begin{equation}
+	\alpha_r \, n = 1 + \min\{ k \,\mid\, A\, k\, r \geq (n + 1) \}
+\end{equation}
+\end{definition}
+
+This definition is very similar to Nivasch's, except for some shifting by one. Throughout the rest of the thesis, we will assume a fixed and positive $r$, and prove all statements related to the inverse Ackermann function using $\alpha_r$, including the final Hoare-Triples, which shows that the election of a specific $r$ is not important.
+
+We also prove lemmas that hint at the slow rate at which $\alpha$ grows. 
+
+\begin{lemma}{$\alpha$\_n\_0\_$\alpha$\_logn}
+	\newline
+	\textbf{Assume:} $16 \leq n$
+	\begin{equation}
+	\alpha \, n \leq 1 + (\alpha \, (\log{n}))
+	\end{equation}
+	
+\end{lemma}
+
+According to Charguéraud and Pottier, this lemma is far-reaching, as it shows that $\alpha \, n$ and $\alpha \, (\log{n})$ are asymptotically equivalent. It is in fact an exercise in CLRS to show this is the case. One could even substitute $\log$ by the iterated logarithm, or any reasonable slow-growing function, recall the fact that $A$ grows faster than any primitive recursive function.
+
+The following lemma is much more explicit, and was one of the initial motivations for the authors to start this project:
+
+\begin{lemma}{observable\_universe\_$\alpha$}
+		\newline
+	\textbf{Assume:} $n \leq 10^{80} $
+	\begin{equation}
+	\alpha \, n \leq 4 \label{universealpha}
+	\end{equation}
+\end{lemma}
+
+The figure $10^{80}$ is one of the current estimates of the number of atoms in the universe. If the estimate ever grows, even significantly, it would not change the bound, as, following CLRS, we were able to prove that $A\, 4\, 1 > 16^{512}$. This means that for all ``practical'' inputs, with a very liberal interpretation of the word, $\alpha$ is at most $4$.
+
+
+
+
+
+
+\chapter{The Proof in Isabelle}
+
+The goal of this thesis was to prove the $\alpha$-bound asymptotic time complexity of the \textit{Union} and \textit{Find} operations. This proof is famously non-trivial and has been improved over the years to the current standard version in CLRS, which however has lost any insight into why the inverse Ackermann function arises. This proof does not include most details, and a formalized proof would require a far too extensive level of creativity.
+
+The paper by Alstrup et al. improves the bound slightly by limiting the argument of $\alpha$ to the size of the largest equivalence class, instead of the whole domain, and crucially provides some detailed proofs. They introduce some new concepts which allow for more context-sensitivity of the bounds, most importantly they link all bounds to the rank of the existing nodes (a lower bound on the size of the equivalence class) instead of to the size of the data structure, which was in earlier proofs fixed. 
+
+This is used by Charguéraud and Pottier to implement a dynamic, pointer based implementation of Union-Find in OCaml, which they verify using a similar framework implementing separation logic with time credits in Coq \cite{Gueneau18}. The result they use for the Hoare-Triples is slightly weaker than the one by Alstrup et al. as the $\alpha$ bound refers to the current size of the whole domain, but they formalize the tighter bound as well, which we will also prove.
+
+
+Our implementation is based on the work by Haslbeck and Lammich \cite{HaslRef19}, which had already proved the correctness and worst-case logarithmic asymptotic complexity of an array-based implementation. In order to minimize the duplication of work, we started as close as possible to them. We decided also to follow the proof by Charguéraud and Pottier for the abstract analysis of the data structure. It was crucial that both proofs separate the abstract, mathematical view of the data structure as a relation, a graph or a list and its properties from the proof about the imperative program. This allowed us to mimic most of the Coq analysis in Isabelle, with some adaptations, even though the resulting implementation is vastly different, as are the frameworks for modeling the imperative semantics and the tools they provide. In principle, this means that many lemmas can be reused in future work by diverging implementations of Union-Find.
+
+The proof in Coq is about 4KLoc, and our resulting proof is of similar length. This proof required many more fine-grained concepts about the data-structure, much theory surrounding them, and a different, stronger invariant (see the following section) than the one used in the worst-case analysis.
+
+
+\section{Porting from Coq}
+
+This section aims to give an anecdotal but hopefully practical view on the problems that arose while porting proofs from Coq to Isabelle/HOL. It should be noted as a starting remark that the authors are users only of Isabelle/HOL and have only a superficial understanding of the Coq system. A special thank you goes to Armaël Guéneau, who introduced the authors to Coq. This comparison deviates from others in the literature by providing a practical view on the current state of theorem proving in both systems rather than comparing the theoretical foundations \cite{Comparison}.
+
+Superficially, the Gallina language used by Coq is similar to the \textit{apply-style} scripts that are often considered bad style in the Isabelle/HOL community. It is however much richer than that, and for the writer of proofs there does not seem to be much of a difference in the expressiveness. In particular, and in contrast to \textit{apply-style} scripts, it is possible to construct forward proofs by explicitly stating new subgoals which can later be referenced. The Isar language is of course specifically targeted to making proofs easier to read without the proof state at every point. However, in our opinion, the current proof state is in both systems necessary to follow a difficult proof in detail. The differences lay of course much more on the tactics available, and the quality of the proof library.
+
+All in all Coq has many more specialized tactics \cite{CoqRefMan} which allow for some fine grained manipulation of assumptions and goals. Isabelle's tactics seem to be more powerful, and the Isar language allows for complex proofs without editing the terms explicitly. However, some tactics could be useful to improve backwards reasoning in Isabelle/HOL. The clearest advantage of Isabelle/HOL over Coq is of course the Sledgehammer tool, which simplifies proof exploration and finalization enormously. Because of this aspect alone, together with the better IDE support and the greater interactivity of the proof process we would deem the current Isabelle/jEdit system the most user-friendly, both being mostly equivalent in their power to develop proofs.
+
+\subsection{Reasoning about Arithmetic}
+\subsubsection{$\mathrm{Suc}\, x$ and $x + 1$}
+
+This is mostly a small complaint about some lemmas which are by default in the simpset in Isabelle/HOL. Many times, a forward style arithmetic proof using Isar's equational reasoning is unnecessarily tedious, as it requires to write every step explicitly. When the steps involve precise lemmas needed to move forward, it normally boils down to looking up the lemma, tailoring the next step to use it, and proving the step by applying the lemma.
+
+In this case a simple backward proof applying the equations and rules available is easier to follow, and much easier to write. In most cases, however, providing the lemmas to higher level tactics such as auto or simp is not enough in every step because these tend to rewrite things like $1$ to $\mathrm{Suc}\, 0$. Of course, a careful presentation of the lemmas helps, but is often not enough, and the proof ends up cluttered with very low level substitutions between the actual steps which make progress, which of course hinders readability. Some examples of this problem can be found in Ackermann.thy.
+
+Coq does not seem to have any tendency to rewrite \verb|n + 1| to \verb|S n|, so the backwards proofs are more readable.
+
+\subsubsection{generalize dependent}
+
+Consider the following equation (easy for a human or a CAS, but difficult for the automatic tactics of a proof assistant):
+
+\begin{equation*}
+	2 (2 ^ i  (1 + x) - 1) + 1 = 2 \cdot 2 ^ i(1 + x) - 1
+\end{equation*}
+
+The factors $2^i$ and $(1+x)$ are probably being unfolded and mangled with by the tactics, when they are not key to the identity. So one could replace them by two new variables $n$ and $y$, yielding:
+
+\begin{equation*}
+2 (ny - 1) + 1 = 2 \cdot n \cdot y - 1
+\end{equation*}
+
+which can be proved by a tactic, as the search space is much smaller (with an explicit and large $i$, such in the proofs about the observable universe bound of $\alpha$, the tactics really do unfold too much and take seconds to finish).
+
+In Coq, you can explicitly declare new variables to replace those expressions (do not pay much attention to the \verb|intros|, that is a standard Coq idiom for a goal of the form $A \longrightarrow B$):
+
+\begin{lstlisting}
+	generalize dependent (2^i); intro n; intros.
+	generalize dependent (1+x); intro y; intros.
+\end{lstlisting}
+
+In Isabelle/HOL you would need to either prove the second equation first and then instantiate it or obtain some new variables relating to the old and rewriting all terms.
+
+\subsubsection{Generalized Rewriting}
+
+The default rewriting method in Isabelle/HOL is subst. In Coq you have \verb|rewrite| and \verb|replace term1 with term2|. 
+
+\verb|rewrite| is superficially mostly equivalent to subst, except for a more pleasant syntax that reduces the need for the symmetric parameter. It is possible to use it on named assumptions instead of only on an indexed occurrence. When applied to an assumption, it also does not change the whole goal from a list of assumptions and a goal $B$ to a goal of the form $A_1 \Longrightarrow \dots \Longrightarrow A_n \Longrightarrow B$.
+
+Moreover, it also allows for rewriting inequalities, so if we have an assumption of the form $A_1: B \leq C$ and we want to show $A \leq C$, the tactic \verb|rewrite |$A_1$\verb|.| will change the goal to $A \leq B$, which in Isabelle/HOL would require to apply a transitivity rule.
+
+Generalized rewriting can be extended to many more forms of equations axiomatically \cite{CoqRefMan}, so it is a very powerful and extendable mechanism to deal with chains of equations.
+
+\verb|replace| enables to rewrite equations not yet proved, so it transforms \verb|term1| to \verb|term2|, and then generates a subgoal for this not yet proven equality. It allows to perform simple transformations which can be proved automatically without cluttering the proof with named lemmas, or the need to recall the names of existing low level lemmas. This is also useful in making backward proofs more readable.
+
+\subsection{Trivia}
+
+\subsubsection{unpack}
+
+This tactic comes from the LibTactics library by Charguéraud \cite{LibTactics}, and destructs conjuntions and existentials in the assumptions. This is useful for example when an invariant is assumed, which is a conjunction of several properties, and when proving a specific subgoal only one of them is needed. It is also superior to the simple existential introduction rule, which only allows the existential quantifier at the outer most level.
+
+
+\section{Abstract Analysis}
+
+
+\begin{figure}
+	\centering
+	\resizebox{1.1\columnwidth}{!}{%
+		\begin{tikzpicture}[transform shape]
+		
+		% Draw diagram elements
+		\path \defnodea {1}{$\alpha_f$};
+		\path (p1.south)+(5.0,0.51) \defnodea{2}{$\beta_f$};
+		
+		\path (p1.south)+(0.0,-2.25) \defnodeb{3}{$A$};
+		\path (p3.south)+(0.0,-1.0) \defnodeb{5}{$\alpha$, $\alpha_r$};
+		\path (p3.south)+(5.0,-1.0) \defnodeb{4}{Further contributions};
+		
+		\path (p3.south)+(-7,-1) \defnodec{6}{$\mathcal{L}$, $\mathcal{R}$};
+%p6
+		\path (p6.south)+(0.0,-1.0) \defnodec{60}{level, index}; %p7
+		
+		\path (p60.south)+(-2.5,-1.25) \defnodec{7}{State Evolution};
+		\path (p60.south)+(2.5,-1.25) \defnodec{8}{Pleasantness};
+		\path (p8.south)+(0.0,-1.0) \defnodec{80}{Invariants};
+		
+		
+		\path (p7.south)+(0.0,-1.0) \defnodec{70}{Iterated Path Compression};
+		
+		\path (p70.south)+(2.5,-1.25) \defnodec{71}{$\phi$ and $\Phi$};
+		\path (p71.south)+(0,-1.00) \defnodec{72}{The Public Theorems};
+		
+		
+		\path (p72.south)+(-2.5,-2.5) \defnoded{9}{$\mathtt{init}\, \in \mathcal{O}(n)$};
+		\path (p9.south)+(3,0.5) \defnoded{10}{$\mathtt{cmp}\,\in\mathcal{O}(\alpha\, n)$};
+		\path (p10.south)+(3,0.5) \defnoded{11}{$\mathtt{union}\,\in\mathcal{O}(\alpha\, n)$};
+		
+		\path [line] (p5.east) -- +(1.3,0.0) -- +(1.3,4.3) -- node [above] {} (p1);	
+		\path [line] (p5.east) -- +(1.3,0.0) -- +(1.3,4.3) -- node [above] {} (p2);
+		
+		\path [line] (p6.north)+(0.0,0.5) -- +(0.0,1.0) -- node [above] {} (p3);
+		\path [line] (p6.north)+(0.0,0.5) -- +(0.0,1.0) -- +(4.5,1.0) -- +(4.5,-0.51) 
+		-- node [above] {} (p5);
+		
+		\path [line] (p60.north) -- node [above] {} (p6);
+		\path [line] (p70.north) -- node [above] {} (p7);
+		
+		\path [line] (p60.west) -- +(-1.35,0.0) -- node [above] {} (p7);
+		\path [line] (p7.west) -- +(-0.25,0.0) -- +(-0.25,3.3) -- node [above] {} (p6);
+		
+		\path [line] (p8.north) -- +(0.0,0.25) -- +(-2.5,0.25) -- node [above] {} (p60);
+		\path [line] (p60.east) -- +(13.0,0.00) -- +(13.0,5.82) -- node [above] {} (p2);
+		
+		\path [line] (p80.east) -- +(0.25,0.0) -- +(0.25,4.82) -- node [above] {} (p6);	
+		
+		\path [line] (p71.north) -- +(0.0,2.8)-- node [above] {} (p7);	
+		\path [line] (p71.north) -- +(0.0,1.25) -- node [above] {} (p70);	
+		\path [line] (p71.north) -- +(0.0,2.8)-- node [above] {} (p8);	
+		\path [line] (p71.north) -- +(0.0,1.25) -- node [above] {} (p80);	
+		
+		\path [line] (p72.north) -- node [above] {} (p71);
+		
+		\path [line] (p10.north)+(-0.5,0.5) -- node [above] {} (p72);
+
+		
+		\background{p1}{p1}{p2}{p2}{InverseNatNat}
+		\background{p3}{p3}{p4}{p4}{Ackermann}
+		\background{p7}{p6}{p8}{p72}{Abstract Analysis}
+		\background{p9}{p9}{p11}{p11}{Imperative Verification}
+		
+		
+		\end{tikzpicture}
+	}
+	\caption{Overview of the logical dependencies between the theories presented.} \caption*{An arc points to the theory or section containing a required definition or lemma.}
+\end{figure}
+
+\subsection{Important Definitions}
+The abstract analysis deals with the data structure as two lists, one with the tree structure $\mathcal{L}$ and one with the corresponding ranks $\mathcal{R}$. This view point is not enough, as we want to prove properties about the modeled disjoint set forest, equivalence class, and the transformations performed by \textit{Union}, and by path compression.
+
+\begin{definition}{Disjoint set forest}
+
+The parent of a node i is: 
+\begin{equation}
+\LL!i
+\end{equation}
+
+The representative of a node is:
+\begin{equation}
+\repof i := \begin{cases}
+i &\mathrm{if}\,\, \LL!i = i \\
+\repof (\LL!i) &\mathrm{otherwise}
+\end{cases}
+%\mathrm{if}\,\, \LL!i = i \,\,\mathrm{then}\,\, i\,\, \mathrm{else}\,\, \repof (\LL!i)
+\end{equation}
+
+Through the representative, we identify the equivalence classes of the disjoint set forest:
+
+\begin{equation}
+\ufaalpha := \{(x,y) \,\mid\, x<|\LL| \land y<|\LL| \land \repof x = \repof y\}
+\end{equation}
+
+And the height of a node:
+
+\begin{equation}
+	\mathrm{height\_of}_\LL\, i := \begin{cases}
+	0 &\mathrm{if}\,\, \LL!i=i\\
+	1 + \mathrm{height\_of}_\LL\, (\LL!i) &\mathrm{otherwise}
+	\end{cases}
+	 %\mathrm{if}\,\, \LL!i=i\,\, \mathrm{then}\,\, 0 \,\,\mathrm{else}\,\, 1 + \mathrm{height\_of}_\LL\, (\LL!i)
+\end{equation}
+
+We also define the more precise child-parent relation:
+
+\begin{equation}
+\ufabstart := \{(x,y) \,\mid\, x<|\LL| \land y<|\LL| \land x \neq y \land \LL!x = y \}
+\end{equation}
+
+Its closures, the strict and non-strict paths in the graph:
+
+\begin{equation}
+\ufabtrans := (\ufabstart)^+ \quad \ufabrefl := (\ufabstart)^*
+\end{equation}
+
+Where $R^+$ and $R^*$ are respectively the transitive and reflexive transitive hull of a relation $R$.
+
+And the descendants and ancestors of a node:
+
+\begin{align}
+\mathrm{descendants}_\LL \, i := \{j \,\mid\, (j,i) \in \ufabrefl\} \\
+\mathrm{ancestors}_\LL \, i := \{j \,\mid\, (i,j) \in \ufabrefl\}
+\end{align}
+
+\end{definition}
+
+\HandPencilLeft\,\, This relations are ultimately defined depending on $\LL$, but any other functional relation (where a node has only one parent) satisfying the same classical properties of the hull could be used. All following lemmas would just need to replace any occurrence of $i < |\LL|$ with $i \in \mathrm{Dom}\, R$. In our case we did not do it, as of course $\mathrm{Dom}\, \ufabrefl = \{0, \dots, |\LL| - 1\}$.
+
+We only want to allow lists which represent a disjoint set forest, so $\ufabtrans$ cannot have any cycles. This is characterized by the first part of the invariant required:
+
+\begin{definition}{ufa\_invar}
+	\begin{equation}
+	\mathrm{ufa\_invar} \, \LL \, := \forall i < |\LL|.\, i \in \mathrm{Dom}\, \repof \land \LL!i < |\LL|
+	\end{equation}
+	
+\end{definition}
+
+This is equivalent to not having any cycles, as every node in a cycle would not be in the domain of $\repof$. On top of that, we do not allow parents outside the domain.
+
+Finally, we define the full invariant enforced on the data structure (we will then show that union and path compression preserve the invariant):
+
+\begin{definition}{invar\_rank}
+\begin{align}
+\mathrm{invar\_rank}\, \LL \, \RR := 
+&\mathrm{ufa\_invar} \, \LL \, \land \\
+&|\LL| = |\RR| \, \land \\
+&(\forall (i,j) \in \ufabstart. \, \RR!i < \RR!j) \\
+&(\forall i < |\LL|.\, \LL!i = i \longrightarrow 2^{\RR!i} \leq |\mathrm{descendants}_\LL \, i|)
+\end{align}
+\end{definition}
+
+Which in words means: 
+\begin{itemize}
+	\item $\LL$ models a disjoint set forest.
+	\item The domain of the rank is the same as the domain of the child-parent relation.
+	\item The rank of a parent is greater than the rank of any of its children.
+	\item The rank of a root never exceeds the logarithm of the size of its descendants.
+\end{itemize}
+
+\subsection{The Rank}
+
+We have mentioned before that the rank of a node is an upper bound on its height in the tree, this is specified by the lemma \textit{rank\_bounds\_height}, which states that if there is a path from $i$ to $j$ of length $k$, then $k \leq \RR!j$ (or, more precisely $\RR!i + k \leq \RR!j$). The longest path from a node is the one to the root, and the length of this path defines the height. As the height, the rank is bounded by $\log{|\LL|}$.
+
+Following \cite{Alstrup14}, we will for most purposes use a modified rank:
+
+\begin{definition}{rankr}
+	\begin{equation}
+		\RR_r \, i := \RR!i + r
+	\end{equation}
+	Recall $r$ from \ref{alphar} is a fixed parameter.
+\end{definition}
+
+The (modified) rank always grows along paths, and strictly along non-trivial paths, and by extension of course $\alpha_r \, (\RR_r \, i)$ also grows along paths, as $\alpha_r$ is monotonic.
+
+\subsection{The Level and the Index}
+
+The potential function $\Phi$ refers to the ``entropy'' of the data structure, so a higher potential means more disorder. The potential grows when cheap operations are performed, and decreases with expensive operations. This models the credit method defined by Tarjan when he introduced amortized analysis \cite{Tarjan85}, a high potential means credits are saved for extra work. In our case, we will store $\Phi$ time credits in the heap, which will be enough, together with the advertised cost, to pay for each operation. This is the key to amortized analysis with time credits.
+
+The potential of the Union-Find data structure was defined similarly in all proofs since \cite{Tarjan1975b}, but this form was introduced by Alstrup et al. \cite{Alstrup14}. In order to define it, we need two subtle concepts, the index and the level (only defined for non-root nodes):
+
+\begin{definition}{level}
+	\begin{align}
+	\mathrm{defk}\, i \, k &:= A\, k \, (\RR_r\ i) \\
+	\level i &:= 1 + (\beta_{defk} \, (\RR_r\ (\LL!i)))
+	\end{align}
+
+	which unfolded yields
+	
+	\begin{equation}
+	\level i = 1 + \max \{k \,\mid\, \RR_r \, (\LL!i) \geq A\, k \, (\RR_r\, i)\}
+	\end{equation}
+\end{definition}
+
+The level is well-defined, as the following $k$ always satisfies the inequality:
+
+\begin{lemma}{level\_exists}
+	\begin{equation}
+	A\, 0\, (\RR_r\, i) \leq \RR_r\, (\LL!i)
+	\end{equation}
+\end{lemma}
+
+According to Charguéraud and Pottier, the level of a node is a measure of the distance of its rank to the rank of its parent. Where these ranks are closest we have $\RR_r\, (\LL!i) = 1 + (\RR_r\, i)$, so the level is exactly one. When the ranks are furthest away, we get the following lemma:
+
+\begin{lemma}{level\_lt\_$\alpha_r$} 
+	\begin{equation}
+		\level i < \alpha_r\, (\RR_r\, (\LL!i)) \label{levelalpha}
+	\end{equation}
+\end{lemma}
+
+The proof of this lemma is simple because we can make use of the lemmas from the InverseNatNat.thy theory, so we can easily transform the goals into a form for which the lemmas available in Ackermann.thy apply.
+
+\begin{definition}{index}
+	\begin{align}
+	\mathrm{prei}\, i \, j &:= (A\, (\level i - 1))^{(j)} \, (\RR_r\, i)\\
+	\iindex i &:= \beta_{prei}\, (\RR_r\, (\LL!i))
+	\end{align}
+	
+	which unfolded yields:
+	
+	\begin{equation}
+	\iindex i = \max\{j \,\mid\, \RR_r\, (\LL!i) \geq (A\, (\level i - 1))^{(j)}\, (\RR_r\, i)\}
+	\end{equation}
+\end{definition}
+
+The index is of course always well defined, as there is always a $j$ satisfying the inequality:
+
+\begin{lemma}{index\_exists}
+	\begin{equation}
+	(A (\level i - 1))^{(0)} (\RR_r\, i) \leq \RR_r\, (\LL!i)
+	\end{equation}
+\end{lemma}
+
+The index satisfies the following lower and upper bounds:
+
+\begin{lemma}{index\_ge\_1\_le\_rank}
+\begin{equation}
+	1 \leq \iindex i \leq \RR_r\, i
+\end{equation}
+\end{lemma}
+
+\subsection{The Potential Function $\Phi$}
+
+We define first the potential for a single node:
+
+%\begin{definition}{$\phi$}
+%	\begin{align}
+%	\begin{split}
+%	\philr i := &\mathrm{if}\, \LL!i=i \, \mathrm{then}\, \alpha_r\, (\RR_r\, i) \cdot (1 + (\RR_r\, i)) \\
+%	&\mathrm{else} \, (\mathrm{if}\, \alpha_r\, (\RR_r\, i) = \alpha_r\, (\RR_r\, (\LL!i))\\
+%	&\quad\quad\,\,	\mathrm{then}\, (\alpha_r\, (\RR_r\, i) - \level i) \cdot \RR_r\, i - \iindex i + 1 \\
+%	&\quad\quad\,\, \mathrm{else}\, 0)
+%	\end{split}
+%	\end{align}
+%\end{definition}
+
+\begin{definition}{$\phi$}
+		\begin{equation*}
+		\philr i :=
+		\begin{cases}
+		\alpha_r\, (\RR_r\, i) \cdot (1 + (\RR_r\, i)) & \mathrm{if}\, \LL!i=i \,   \\
+		 (\alpha_r\, (\RR_r\, i) - \level i) \cdot \RR_r\, i - \iindex i + 1  &\mathrm{if}\, \alpha_r\, (\RR_r\, i) = \alpha_r\, (\RR_r\, (\LL!i))\\
+		0 & \mathrm{otherwise}
+		\end{cases}
+		\end{equation*}
+\end{definition}
+
+
+There are according lemmas that guarantee that the subtractions will not result in a negative number. In fact, except in the last case, where $\phi$ is explicitly set to $0$, we have $\philrb \geq 1$.
+
+To define the potential of the entire data structure, we sum over every node:
+
+\begin{definition}{$\Phi$}
+	\begin{equation}
+	\Philr :=  \sum_{i = 0}^{|\LL| - 1}{\philr i}
+	\end{equation}
+	
+\HandPencilLeft \, \, Recall again that $\{0,\dots, |\LL|-1\}$ is in this case the domain of our equivalence relation. In an alternative implementation of the data structure, this would be a sum over its domain.
+
+\end{definition}
+
+\subsection{State Evolution}
+
+On our way to analyzing the behavior of \verb|uf_union| and \verb|uf_cmp|, we first define the union of two disjoint set trees and a single step of path compression abstractly. These are the only operations that modify the state and thus need to be analyzed to ensure they do not break the invariant:
+
+\begin{definition}{Abstract Union}
+	\newline
+	First, we define the union of the equivalence classes of two nodes:
+	\begin{equation}
+	\ufaunion x \, y := \LL[\repof x := \repof y]
+	\end{equation}
+	
+	However, we only perform unions according to the rank heuristic, therefore we define the operations that, given a disjoint set forest list and a rank list, return the modified lists:
+	
+	\begin{align}
+	%\ufaunionl x\,y := \mathrm{if} \, \RR!x < \RR!y \,&\mathrm{then}\, \ufaunion x\,y \\
+	%&\mathrm{else}\, \ufaunion y\,x
+	\ufaunionl x\,y &:= \begin{cases} \ufaunion x\,y &\,\,\,\, \mathrm{if} \, \RR!x < \RR!y \\\ufaunion y\,x &\,\,\,\, \mathrm{otherwise}
+	\end{cases}
+	\\
+	%\ufaunionrkl x\, y := \mathrm{if} \, \RR!x = \RR!y \,&\mathrm{then}\, \RR[x := 1 + \RR!x] \\
+	%&\mathrm{else}\, \RR
+	\ufaunionrkl x\, y &:= \begin{cases} \RR[x := 1 + \RR!x] & \mathrm{if} \, \RR!x = \RR!y \\\RR & \mathrm{otherwise}
+	\end{cases}
+	\end{align}
+	
+	The operation $\mathcal{L}[x := y]$ is just the list update operation, replacing the element in $\mathcal{L}$ at position $x$ by $y$.
+	
+\end{definition}
+
+
+We have yet to consider the iterated path compression, which not only links a node to the root, but also all the nodes on the path to the root. Before that, we prove that union of two trees and a single step of compression preserve the invariant. These two elementary operations are what we call in the Isabelle proof \textit{State Evolution}. We modify the state of the data structure only through composition of these operations.
+
+\begin{lemma}{invar\_rank\_union}\newline
+\textbf{Assume: } $\mathrm{invar\_rank}\,\LL\,\RR$; $x,y < |\LL|$; $x \neq y$; $x = \LL!x$; $y = \LL!y$
+\begin{equation}
+\mathrm{invar\_rank}\,(\ufaunionl x\,y)\,(\ufaunionrkl x\,y)
+\end{equation}
+\end{lemma}
+
+\begin{lemma}{invar\_rank\_compress}\newline
+\textbf{Assume: } $\mathrm{invar\_rank}\,\LL\,\RR$; $(x,y) \in \ufabstart$
+\begin{equation}
+	\mathrm{invar\_rank}\, (\LL[x := \repof y])\, \RR
+\end{equation}
+\end{lemma}
+
+The change of the rank during state evolution is more or less trivial. It is monotone and only really increases for roots. The analysis of the level and the index is more subtle, and we come to the following conclusions (we refer to the Isabelle proof for the detailed statements): 
+\begin{itemize}
+	\item \mbox{\textbf{Lemma.} \textit{levelx\_levely\_compress} \eqnum:} \newline During compression on $x$, either the rank or the index increase. 
+	\item \mbox{\textbf{Lemma.} \textit{level\_v\_grows}} \eqnum: \newline During any state evolution step, as the rank of a non-root node $x$ is constant while the rank of its parent may grow, the level of $x$ can only grow.
+	\item \mbox{\textbf{Lemma.} \textit{index\_v\_grows\_if\_level\_v\_constant}} \eqnum: \newline After a state evolution step, if the level remains constant, the index can only grow.
+\end{itemize}
+
+\subsection{Iterated Path Compression}
+
+We define two equivalent inductive predicates which encode the operation of compressing a whole path, up to the root:
+
+\begin{definition}{Forward and backward iterated path compression}
+\begin{align}
+\begin{split}
+	&\text{ BWIPCBase: 
+	\AxiomC{$x = \mathcal{L}!x$}
+	\UnaryInfC{$\mathrm{bw\_ipc}\, \mathcal{L}\, x\, 0\, \mathcal{L}$}
+	\DisplayProof
+	} \\
+	\\
+	&\text{ BWIPCStep: 
+		\AxiomC{$(x,y) \in \ufabstart$}
+		\AxiomC{$\mathrm{bw\_ipc}\, \mathcal{L}\, y\, i\, \mathcal{L}'$}
+		\BinaryInfC{$\mathrm{bw\_ipc}\, \mathcal{L}\, x\, (i + 1)\, \mathcal{L}'[x := \repof x]$}
+		\DisplayProof
+	}
+\end{split}
+\\
+\begin{split}
+	&\\
+	&\text{ FWIPCBase: 
+	\AxiomC{$x = \mathcal{L}!x$}
+	\UnaryInfC{$\mathrm{fw\_ipc}\, \mathcal{L}\, x\, 0\, \mathcal{L}$}
+	\DisplayProof
+	} \\
+	\\
+	&\text{ FWIPCStep: 
+	\AxiomC{$(x,y) \in \ufabstart$}
+	\AxiomC{$\mathrm{fw\_ipc}\, \mathcal{L}\, y\, i\, \mathcal{L}'[x := \repof y]$}
+	\BinaryInfC{$\mathrm{fw\_ipc}\, \mathcal{L}\, x\, (i + 1)\, \mathcal{L}'$}
+	\DisplayProof
+	}
+\end{split}
+\end{align}
+
+ipc stands in both cases for iterated path compression and, in words, $\mathrm{ipc}\,  \mathcal{L}\, x\, i\, \mathcal{L}'$ means that in the initial state $\mathcal{L}$, performing path compression along the path starting at $x$ leads in $i$ steps to the final state $\mathcal{L}'$.
+\end{definition}
+
+The forward variant corresponds intuitively to a two-pass algorithm, similar to our implementation, in which a first pass finds the representative of x, and the second pass performs the compression. This is clearly the composition of several compression steps formulated in the previous section. This formulation therefore makes the proof of many lemmas simpler.
+
+The backwards variant is more alike a one-pass, recursive algorithm for path compression, similar to the one by Charguéraud and Pottier, where path compression is performed while unwinding the stack created by recursively finding the representative. This formulation is not clearly the composition of several compression steps as it is not trivial that the representative of $x$ before compression remains the same after compression.
+
+In a non-formal proof, one could say it is obvious that paths and representatives on trees not affected by compression are not changed, or that the final state $\mathcal{L}'$ is always defined and unique, and indeed that the two predicates are equivalent. All these statements were inductively proved in this formal context. 
+
+
+\subsection{Pleasantness}
+
+We define the notion of pleasantness, which is the property of a node of having a strict non-root ancestor with identical level, and we derive an upper bound on the amount of unpleasant nodes. This part of the analysis was particularly challenging, as it required a more comprehensive theory about preservation of invariants and paths than the previous lemmas, among others the preservation of $\mathrm{ufa\_invar}$ after arbitrary compressions that do not generate a cycle, as well as a very careful use of contexts and generalizations.
+
+\begin{definition}{top\_part}\newline
+	We define a node to be in the top part of its tree if $\alpha_r$ of its rank is the same as $\alpha_r$ of the rank of the root (its representative):
+	\begin{equation}
+	\toppart x := (\alpha_r\, (\RR_r\, x)) = (\alpha_r\, (\RR_r\, \repof x))
+	\end{equation}
+	the plesantness notion:
+	\begin{align}
+	\begin{split}
+	\pleasant x := \, & \toppart x \, \land \\
+			& (\exists y.\, y\neq \LL!y \land ((\LL!x),y)\in\ufabrefl \,\land \\
+			& \level x = \level y)
+	\end{split}
+	\end{align}
+	this is a sound definition of the top-part, as it is preserved when going up the graph (\textbf{Lemma.} top\_part\_hereditary \eqnum).
+	
+	We define the displeasure of a node as the number of unpleasant ancestors:
+	\begin{equation}
+	\displeasure x\, := \, |(\mathrm{ancestors}_{\LL}\, x) \cap \{y\,\mid\, \lnot \pleasant y\}|
+	\end{equation}
+\end{definition}
+
+The displeasure of a parent grows by exactly one if the child was unpleasant, and stays constant if the child was pleasant. (\textbf{Lemma.} \textit{displeasure\_parent\_if\_unpleasant} \eqnum\, and \textbf{Lemma.} \textit{displeasure\_parent\_if\_pleasant} \eqnum).
+
+Finally, we show that the displeasure of a node is bounded by the number of distinct levels of its non-root ancestors (this number is called in the proof the \textit{levels} of a node), and in turn this is bounded by $\alpha_r$ of the rank of its representative. To prove this, we need to distinguish between pleasant and unpleasant nodes, establish a bound that relates to their \textit{levels}, and at the end relate \textit{levels} to $\alpha_r$. There are also several lemmas about the conservation of displeasure after compression. 
+
+At the end, we arrive at the main result in Alstrup et al.'s paper, from which we will derive the public theorems:
+
+\begin{lemma}{bounded\_displeasure\_alstrup} \newline
+	\textbf{Assume: } $\toppart x$; $x<|\LL|$
+	\begin{equation}
+		\displeasure x \leq \alpha_r\, (\RR_r\, (\repof x))
+	\end{equation}
+\end{lemma}
+
+This result ultimately follows from \ref{levelalpha}, and the monotonicity of the level along paths.
+
+\subsection{The Public Theorems}
+
+We called this theorems public, as they are in principle the only ones needed by a user of the abstract data structure to prove the correctness and the asymptotic properties of an implementation. If we regard the whole proof as a black box, these are the only really interesting results.
+
+\subsubsection{Theorems for the Amortized Analysis}
+
+The main theorem relates the steps required to perform an iterated path compression, the potential before and after the compression, and $\alpha_r$ of some measure in the data structure. These theorems implicitly assume the invariant for the lists. We will start with the strong result by Alstrup et al.:
+
+\begin{theorem}{amortized\_cost\_of\_iterated\_path\_compression\_local} \newline
+	\textbf{Assume: } $x < |\LL|$
+	\begin{align}
+	\begin{split}
+	\exists i\, \LL'.\,& \mathrm{bw\_ipc}\, \LL\, x\, i\, \LL'\, \land\\
+	& \Phi\, \LL'\, \RR\, + i < \Philr + 2 \cdot \alpha_r\, (\RR_r\, (\repof x))
+	\end{split}
+	\end{align}
+	It is called local because the bound refers to the rank of the representative, so it is just bounded by the size of the equivalence class instead of by the size of the whole data structure. 
+	
+	\HandPencilLeft\, We could use this theorem to prove a tighter bound in the Hoare-Triple, which also does not depend on the size of the domain.
+\end{theorem}
+
+We know that the rank is bound by the logarithm of the size of its equivalence class, and in turn this is roughly bound by the size of the domain:
+
+\begin{theorem}{amortized\_cost\_of\_iterated\_path\_compression\_global} \newline
+	\textbf{Assume: } $x < |\LL|$
+	\begin{align}
+	\begin{split}
+	\exists i\, \LL'.\,& \mathrm{bw\_ipc}\, \LL\, x\, i\, \LL'\, \land\\
+	& \Phi\, \LL'\, \RR\, + i < \Philr + 2 \cdot \alpha_r\, (|\LL| + (r - 1))
+	\end{split}
+	\end{align}
+\end{theorem}
+
+This theorem will be used to prove the Hoare-Triple for \verb|uf_rep_of_c|, which is our implementation of the iterated path compression, and the other bounds just follow as a composition of this result and constant size operations.
+
+Much less spectacularly, we must also prove that during the union of two trees the potential only changes by a constant. We can safely assume that the union will occur on roots, as in practice this is the only case:
+
+\begin{theorem}{potential\_increase\_during\_link} \newline
+	\textbf{Assume: } $x \neq y$; $x<|\LL|$; $y<|\LL|$; $x=\LL!x$; $y=\LL!y$
+	\begin{equation}
+	\Phi\, (\mathrm{union\_by\_rank}_{\LL,\RR}^{(\LL)}\,x\,y) \, (\mathrm{union\_by\_rank}_{\LL,\RR}^{(\RR)}\,x\,y) \leq \Philr + 2
+	\end{equation}
+\end{theorem}
+
+\subsubsection{Theorems for the Functional Correctness}
+
+The Hoare-Triples of course also provide the correctness of the implementation, so the following lemmas also need to be provided (here presented only informally):
+
+\begin{itemize}
+	\item \textbf{Lemma. }\textit{invar\_rank\_evolution} \eqnum: A State Evolution step preserves the full invariant.
+	\item \textbf{Lemma. }\textit{ufa\_union\_correct} \eqnum: The \textit{Union} operation, defined as the merging of the two trees, merges the equivalence classes. This lemma and its proof come from the work by Lammich.
+	\item \textbf{Lemma. }\textit{bw\_ipc\_root\_unique} \eqnum: Performing backward iterated path compression on a root can only yield the same list after $0$ steps. This is used as an induction basis.
+	\item \textbf{Lemma. }\textit{ufa\_compress\_aux} \eqnum: A disjoint set forest remains a disjoint set forest after compression to a root (a generalized version was needed for the abstract analysis which enables arbitrary compressions within a tree).
+	\item \textbf{Lemma. }\textit{rep\_of\_invar\_along\_path} \eqnum: The representative of all nodes sharing a path is the same.
+\end{itemize}
+
+\section{Separation Logic with Time Credits}
+
+The concept that time credits can be ``stored'' in a data structure to be used later in time as a way to simplify amortized complexity analysis was introduced by Tarjan \cite{Tarjan85}, and later formalized by Atkey \cite{Atkey10} within separation logic \cite{Reynolds02}. Separation logic is used here, very roughly, as a way to reason about mutable resources in a heap. This is a very natural way of formalizing and proving Hoare-Triples for modular programs, as every separated part of the heap can be dealt with separately.
+
+We will not go into detail about the exact definition of the low-level concepts of separation logic, but for the sake of explaining the notation used in the Hoare-Triples, we will provide an informal explanation of the most important components:
+\begin{itemize}
+	\item $\uparrow(P)$ holds if the heap is empty and $P$ holds as a predicate.
+	\item true and false hold respectively for every heap and for no heap.
+	\item $p \mapsto_a xs$ is the ``points-to'' assertion. The memory cell at location $p$ exists, is ``owned by us'' and contains an array representing the list $xs$.
+	\item $P_1 * P_2$ is the separating conjunction. It holds if the heap can be split into two disjoint parts which respectively satisfy $P_1$ and $P_2$.
+	\item $\exists_A x.\, P$ is just existential quantification lifted to assertions.
+\end{itemize}
+
+
+In our analysis, we use the framework by Zhan and Haslbeck \cite{ZhanHasl18}, which implements Separation Logic with Time Credits as an extension to the already existing separation logic for Imperative/HOL \cite{Bulwahn08}. The idea of this new semantics is that for any execution to succeed, there has to be as many time credits available as ``atomic steps'' of computation performed. 
+
+\begin{definition}{Hoare-Triple}
+	\begin{equation}
+		\langle P \rangle \quad \verb|c| \quad \langle Q \rangle
+	\end{equation}
+	states that for every heap $h$ satisfying $P$ the following holds: the execution of \verb|c| is successful with a new heap $h'$ and a return value $r$ after $t$ time steps, $P$ contains $n \geq t$ time credits, $Q$ contains $n-t$ time credits, and the new heap $h'$ satisfies $Q\, r$.
+\end{definition}
+
+In our analysis we will always use the short notation $\langle P \rangle \quad \verb|c|\quad \langle Q \rangle_t$ which stands for $\langle P \rangle \quad \verb|c|\quad \langle Q * \mathrm{true} \rangle$. As the $\mathrm{true}$ assertion holds for every heap, we can in this way ignore some of the remaining time credits, as $\$(a + b) = \$a * \$b$, and $\mathrm{true}$ holds for $\$b$. This means that the assertion $Q$ does not need to store all of the $n - t$ remaining credits and we may ``throw away'' the rest. If an implementation change required some additional amount of time credits to execute, and there were enough spare credits being thrown away, there would be no need to change the analysis or the Hoare-Triples. This is sometimes referred to in the literature about Separation Logic with Time Credits as ``garbage collection'', as the part of the heap not longer owned and thrown away can model an idealized garbage collection \cite{chargueraud17}.
+
+
+\section{The Hoare-Triples}
+
+In this section we will present the semantic public interface of the data structure, which guarantees the amortized time bound. Following the reasoning above, the idea of an amortized analysis through separation logic with time credits in practice is the following: 
+\begin{itemize}
+	\item Define an assertion which abstracts the data structure and ``stores'', together with the data itself, $\Phi$ time credits.
+	\item Prove the following Hoare-Triples: assuming you have as a precondition the assertion defined above together with an advertised cost of $f\, n$ time credits, you can execute the operation and at the end you have the corresponding assertion of the modified structure.
+\end{itemize}
+
+At the end of a sequence of $k$ operations, only the advertised cost has been paid every time, so the sequence has costed $k \cdot (f\, n)$ time credits. This means by definition that the operation has an amortized time complexity of $f$. How many credits were used in every operation, and therefore stored according to the following assertion is from this perspective unknown, but is irrelevant to the statement about the amortized complexity.
+We define the assertion abstracting our union-find data structure as follows:
+
+\begin{definition}{is\_uf}
+	\begin{align}
+	\begin{split}
+	\mathrm{is\_uf}\, \mathcal{X} \, (s,p) := 
+	&\exists_A \LL\, \RR.\, p \mapsto_a \LL * s \mapsto_a \RR\, * \\
+	&\uparrow (\ufaalpha = \mathcal{X} \land \mathrm{invar\_rank}\, \LL \, \RR)\, * \\
+	&\$(4\cdot\Philr)
+	\end{split}
+	\end{align}
+	
+The existential quantification is necessary so that $\mathrm{is\_uf}$ only depends on the arrays and not on the lists modeled by them. This is only a minor inconvenience in the proofs, which of course require the lists to apply the abstract lemmas.
+\end{definition}
+
+In words, this assertion states the following: \begin{itemize}
+	\item There exist lists $\mathcal{L}$ and $\mathcal{R}$ which model the contents of the arrays $p$ and $s$ respectively.
+	\item $\mathcal{L}$ and $\mathcal{R}$ satisfy the invariant, in particular, $\mathcal{L}$ is a disjoint set forest and $\mathcal{R}$ has been well formed according to our specification.
+	\item The equivalence relation modeled by the disjoint set forest is exactly $\mathcal{X}$.
+	\item We have $4\cdot \Phi$ time credits stored, which can be used additionally to the advertised cost of an operation.
+\end{itemize}
+
+
+As a small disclaimer, the concrete advertised cost functions are only asymptotically optimal. No effort has been put into tightening linear factors, as this is in any case implementation dependent, and in our opinion it does not add anything to the significance of the result, making it however more difficult to make small changes to the implementation.
+
+
+
+\catcode`\_=13 
+\def_{\textunderscore}
+\subsection{uf_init}
+\catcode`_=8
+
+\begin{definition}{uf\_init\_time}
+	\begin{equation}
+	\mathrm{uf\_init\_time}\, n := 16n + 12
+	\end{equation}
+\end{definition}
+
+\begin{lemma}
+	\begin{equation}
+	\mathrm{uf\_init\_time}\, \in \mathcal{O}(n)
+	\end{equation}
+\end{lemma}
+
+\begin{theorem}{uf\_init\_rule}
+	\begin{equation}
+	\left\langle \$(\mathrm{uf\_init\_time}\, n) \right\rangle \quad \mathtt{uf\_init}\, n
+	\quad \left\langle \mathrm{is\_uf}\, \{(i,i) \,\mid\, i<n\} \right\rangle_t
+	\end{equation}
+\end{theorem}
+
+
+\subsection{Hoare-Triples for the Private Functions}
+
+\verb|uf_compress| and \verb|uf_rep_of| will ultimately only be used as a subroutine of \verb|uf_rep_of_c|, in turn a subroutine of \verb|uf_cmp| and \verb|uf_union|, so these do not require the more abstract version of the Hoare-Triple, with the existentially quantified lists. Therefore the Hoare-Triples are a bit lengthier, but are really conceptually simpler.
+
+\begin{lemma}{uf\_rep\_of\_rule}\newline
+	\textbf{Assume: } $\mathrm{ufa\_invar}\, l$; $i<|\LL|$
+	\begin{align}
+	\begin{split}
+	\left\langle p\mapsto_a \LL \, * \$(\mathrm{height\_of}_\LL\, i + 2) \right\rangle \quad & \mathtt{uf\_rep\_of} \, p\,i \\ 
+	&\left\langle \lambda\, r.\, p\mapsto_a \LL \, * \uparrow(r = \repof i)\right\rangle_t
+	\end{split}
+	\end{align}
+	
+	
+\end{lemma}
+
+\begin{lemma}{uf\_compress\_rule}\newline
+	\textbf{Assume: } $\mathrm{invar\_rank}\,\LL\,\RR$; $i<|\LL|$; $c = \repof i$; $\mathrm{bw\_ipc}\, \LL \, i\, d\, \LL'$
+	\begin{align}
+	\begin{split}
+	\left\langle p \mapsto_a \LL\, * \$(1 + d + 3)\right\rangle \quad 
+	&\mathtt{uf\_compress}\, i\, c \\
+	&\langle \lambda\,\_.\, p \mapsto_a \LL'\, *	\uparrow(\mathrm{invar\_rank}\,\LL'\,\RR \land |\LL'|=|\LL| \land\\
+	&(\forall i<|\LL|.\, \repof i = \mathrm{rep\_of}_{\LL'}\, i)) \rangle_t
+	\end{split}
+	\end{align}
+	This lemma links the abstract concept of iterated path compression with its imperative implementation. The proof is by induction on the predicate $\mathrm{bw\_ipc}$ and requires some bookkeeping, but really just follows the code.
+\end{lemma}
+
+\catcode`\_=13 
+\def_{\textunderscore}
+\subsubsection{Compressing when Looking for a Representative}
+\catcode`_=8
+
+The function \verb|uf_rep_of_c| performs a representative search and iterated path compression on the path to this representative. The function is therefore the key to the adequacy of $\Phi$ as the potential function. It is here that the important theorem \textit{amortized\_cost\_of\_iterated\_path\_compression\_global} is used, so we can advertise a cost of $\alpha_r$. The fact that compression is performed is of course crucial to this efficiency bound.
+
+\begin{definition}{uf\_rep\_of\_c\_time}
+\begin{equation}
+	\mathrm{uf\_rep\_of\_c\_time}\, n := 8 \cdot \alpha_r\, (n + (r - 1)) + 16
+\end{equation}
+\end{definition}
+
+\begin{lemma}{uf\_rep\_of\_c\_rule}\newline
+	\textbf{Assume: } $\mathrm{invar\_rank}\,\LL\,\RR$; $i<|\LL|$
+	\begin{align}
+	\begin{split}
+	\langle p\mapsto_a\LL\, * &\$(4 \cdot \Philr + \mathrm{uf\_rep\_of\_c\_time}\, |\LL|) \rangle \quad \mathtt{uf\_rep\_of\_c}\, p\, i \\
+	&\langle \lambda\, r.\, \exists_A \LL'.\, p\mapsto_a \LL' \, *\\
+	& \uparrow(r = \repof i \land \mathrm{invar\_rank}\,\LL'\,\RR \land |\LL|=|\LL'| \land \\
+	& (\forall i<|\LL|.\, \repof i = \mathrm{rep\_of}_{\LL'}\, i)) * \$(4 \cdot \Phi \,\LL'\,\RR)\rangle_t
+	\end{split}
+	\end{align}
+	
+\end{lemma}
+
+\catcode`\_=13 
+\def_{\textunderscore}
+\subsection{uf_cmp}
+\catcode`_=8
+
+The Hoare-Triple present here is in the abstract form. The reader is encouraged to look into the Isabelle code to see how this is refined from statements similar to the ones in the previous subsection.
+
+\begin{definition}{uf\_cmp\_time}
+	\begin{equation}
+	\mathrm{uf\_cmp\_time}\, n := 2 \cdot \mathrm{uf\_rep\_of\_c\_time}\, n + 10
+	\end{equation}
+\end{definition}
+
+\begin{lemma}
+	\begin{equation}
+	\mathrm{uf\_cmp\_time}\, \in \mathcal{O}(\alpha_r\,n)
+	\end{equation}
+\end{lemma}
+
+\begin{theorem}{uf\_cmp\_rule}
+	\begin{align}
+	\begin{split}
+	\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * \$(\mathrm{uf\_cmp\_time}\, |\mathrm{Dom}\, \mathcal{X}|)\rangle \quad &\mathtt{uf\_cmp}\, u\, i\, j\\
+	&\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * \uparrow(r \leftrightarrow (i,j)\in\mathcal{X}) \rangle_t
+	\end{split}
+	\end{align}
+	$u$ is here the tuple of arrays representing the data structure. It is not explicitly unfolded to highlight that the data structure should be viewed only in its abstract form here.
+\end{theorem}
+
+\catcode`\_=13 
+\def_{\textunderscore}
+\subsection{uf_union}
+\catcode`_=8
+
+\begin{definition}{uf\_union\_time}
+	\begin{equation}
+	\mathrm{uf\_union\_time}\, n := 2 \cdot \mathrm{uf\_rep\_of\_c\_time}\, n + 20
+	\end{equation}
+\end{definition}
+\begin{lemma}
+	\begin{equation}
+	\mathrm{uf\_union\_time}\, \in \mathcal{O}(\alpha_r\,n)
+	\end{equation}
+\end{lemma}
+\begin{theorem}{uf\_union\_rule} \newline
+	\textbf{Assume: } $i,j \in \mathrm{Dom}\, \mathcal{R}$
+	\begin{align}
+	\begin{split}
+	\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * \$(\mathrm{uf\_union\_time}\, |\mathrm{Dom}\, \mathcal{X}|)\rangle \quad &\mathtt{uf\_union}\, u\, i\, j\\
+	&\langle \mathrm{is\_uf}\, (\mathrm{per\_union}\, \mathcal{X}\, i\, j)\rangle_t
+	\end{split}
+	\end{align}
+	$\mathrm{per\_union}$ is just the function that merges the two equivalence classes belonging to $i$ and $j$, exactly what \verb|uf_union| is supposed to do.
+\end{theorem}
+
+The proof of this theorem is 400 LoC long, but it is very repetitive and many of the small steps could be replaced with more tailored arguments to the sep\_auto tactic. It would still not be trivial, but all lemmas required to instantiate the correct lists and prove the invariant after the transformation are present, so it is just a matter of optimizing the proof both in length and readability.
+
+
+
+\chapter{Conclusions}
+
+
+
+In this thesis we have proved the classical result about the $\alpha$-bound amortized complexity of an imperative Union-Find data structure. We have further formalized all the mathematical analysis required to prove the state of the art bound by Alstrup et al. for a differing implementation which allows for a growth of the domain of the equivalence relation. This is, to our knowledge, together with the Coq formalization by Charguéraud and Pottier, the only result of this kind. 
+
+On top of that, we provide a more comprehensive theory about the Ackermann function and the first theory about the inverse Ackermann function in Isabelle/HOL, as well as a theory about inverses of natural number functions, which can be used in different contexts. Our formalization of the lemma \ref{universealpha} is, to our knowledge, unprecedented, and thus the first formalization of this intuitively impressive result about the actual slow rate at which $\alpha$ grows.
+
+The proofs of the Hoare-Triples are still a bit too long. This is partly due to lack of optimization of the proofs, because of our limited time, but also to the still lacking support for linear arithmetic by the automation in the Separation Logic with Time Credits framework, and its too aggressive instantiation of existentially quantified variables. This is nonetheless an improvement to the situation in Coq, where, to our knowledge, no such automation is provided. The sep\_auto method is, for instance, very capable of automatically proving statements about pure separation logic.
+
+In our opinion, this result further demonstrates the feasibility of formally verifying the functional correctness and running time bounds for non-trivial algorithm implementations. As it is always the case with formal proofs, it is sometimes necessary to invest time proving intuitively trivial facts, but sometimes this process highlights some necessary hidden assumptions, which are too often ignored in non-formal contexts.
+
+
+
+\appendix{}
+
+\microtypesetup{protrusion=false}
+\lstlistoflistings{}
+\listoffigures{}
+%\listoftables{}
+\microtypesetup{protrusion=true}
+\printbibliography{}
+
+\end{document}

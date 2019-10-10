@@ -1,0 +1,103 @@
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc} % Zeichensatzkodierung
+
+\usepackage{calc} % Berechnungen
+
+\usepackage{relsize}
+\usepackage{xspace}
+\usepackage{listings}
+
+%\usepackage[ngerman]{babel} % Deutsche Lokalisierung
+\usepackage{graphicx} % Grafiken
+\graphicspath{ {./Assets/} }
+\usepackage{caption,setspace}
+\usepackage[export]{adjustbox}
+\usepackage[absolute, overlay]{textpos} % Positionierung
+% Silbentrennung:
+\usepackage{hyphenat}
+%\tolerance 2414
+%\hbadness 2414
+%\emergencystretch 1.5em
+%\hfuzz 0.3pt
+%\widowpenalty=10000     % Hurenkinder
+%\clubpenalty=10000      % Schusterjungen
+%\vfuzz \hfuzz
+
+% Euro-Symbol:
+\usepackage[gen]{eurosym}
+\DeclareUnicodeCharacter{20AC}{\euro{}}
+
+% Schriftart Helvetica:
+\usepackage[scaled]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+\usepackage{mathptmx} % skalierbare Formelschriften
+
+\usepackage{tabularx}
+
+\usepackage{multicol} % mehrspaltiger Text
+
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,decorations.markings,calc,shapes.geometric,shadows,arrows}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\newtheorem*{thm}{Theorem}
+\newtheorem*{dfn}{Definition}
+\newtheorem*{lma}{Lemma}
+
+\usepackage{colonequals}
+
+\DeclareMathAlphabet{\mathcal}{OMS}{cmsy}{m}{n}
+
+\newcommand*{\logeq}{\ratio\Leftrightarrow}
+
+% Erweiterbare Fusszeile:
+\newcommand{\PraesentationFusszeileZusatz}{}
+
+% Define TUM corporate design colors
+% Taken from http://portal.mytum.de/corporatedesign/index_print/vorlagen/index_farben
+\definecolor{TUMBlue}{HTML}{0065BD}
+\definecolor{TUMSecondaryBlue}{HTML}{005293}
+\definecolor{TUMSecondaryBlue2}{HTML}{003359}
+\definecolor{TUMBlack}{HTML}{000000}
+\definecolor{TUMWhite}{HTML}{FFFFFF}
+\definecolor{TUMDarkGray}{HTML}{333333}
+\definecolor{TUMGray}{HTML}{808080}
+\definecolor{TUMLightGray}{HTML}{CCCCC6}
+\definecolor{TUMAccentGray}{HTML}{DAD7CB}
+\definecolor{TUMAccentOrange}{HTML}{E37222}
+\definecolor{TUMAccentGreen}{HTML}{A2AD00}
+\definecolor{TUMAccentLightBlue}{HTML}{98C6EA}
+\definecolor{TUMAccentBlue}{HTML}{64A0C8}
+
+
+\newcommand{\LL}{\mathcal{L}}
+\newcommand{\RR}{\mathcal{R}}
+\newcommand{\repof}{\mathrm{rep\_of}_\mathcal{L}\,}
+\newcommand{\ufabstart}{\mathrm{ufa\_}\beta\mathrm{\_start}_\mathcal{L}}
+\newcommand{\ufabtrans}{\mathrm{ufa\_}\beta^+_\mathcal{L}}
+\newcommand{\ufabrefl}{\mathrm{ufa\_}\beta^*_\mathcal{L}}
+\newcommand{\ufaalpha}{\mathrm{ufa\_}\alpha_\mathcal{L}}
+\newcommand{\level}{\mathrm{level}_{\LL,\RR}\,}
+\newcommand{\iindex}{\mathrm{index}_{\LL,\RR}\,}
+\newcommand{\philr}{\phi\, \LL\, \RR\,}
+\newcommand{\philrb}{\phi\, \LL\, \RR}
+\newcommand{\Philr}{\Phi\, \LL\, \RR\,}
+\newcommand{\Philrb}{\Phi\, \LL\, \RR}
+\newcommand{\ufaunion}{\mathrm{ufa\_union}_\LL\,}
+\newcommand{\ufaunionl}{\mathrm{union\_by\_rank^{(\LL)}_{\LL,\RR}}\,}
+\newcommand{\ufaunionrkl}{\mathrm{union\_by\_rank^{(\RR)}_{\LL,\RR}}\,}
+\newcommand{\toppart}{\mathrm{top\_part}_{\LL,\RR}\,}
+\newcommand{\pleasant}{\mathrm{pleasant}_{\LL,\RR}\,}
+\newcommand{\displeasure}{\mathrm{displeasure}_{\LL,\RR}\,}
+
+
+
+

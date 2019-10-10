@@ -1,0 +1,323 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \input{./Ressources/Presentation/Preamble4to3.tex} % Layout 4:3
+\input{./Ressources/Presentation/Preamble16to9.tex} % Layout 16:9
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{./_Config.tex}                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\Rplus}{\protect\hspace{-.1em}\protect\raisebox{.35ex}{\smaller{\smaller\textbf{+}}}}
+\newcommand{\Cpp}{\mbox{C\Rplus\Rplus}\xspace}
+\newcommand{\CppTw}{\mbox{C\Rplus\Rplus 20}\xspace}
+
+\newcommand{\Datum}{\today}
+
+\renewcommand{\PraesentationFusszeileZusatz}{| Amortized Time Complexity of Union-Find in Isabelle/HOL}
+
+\title{Amortized Time Complexity of Union-Find in Isabelle/HOL \newline \newline {\Large Colloquium to the Bachelor's Thesis \newline}}
+\author{\PersonTitel{} \PersonVorname{} \PersonNachname}
+\institute[]{\UniversitaetName \\ \FakultaetName \\ \LehrstuhlName {\newline}
+Supervisor: Prof. Tobias Nipkow, Ph.D. {\newline} Advisor: Maximilian P.L. Haslbeck, M.Sc.}
+\date[\Datum]{\PersonStadt, October 16, 2019}
+\subject{Amortized Time Complexity of Union-Find in Isabelle/HOL}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{./Ressources/Presentation/Beginning.tex} 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FOLIENSTIL: Standard
+% !!!ÄNDERUNG HIER:!!!
+%\PraesentationMasterStandard
+\PraesentationMasterKopfzeileDreizeiler
+%\PraesentationMasterWeissBlau
+
+%\PraesentationStartseiteFlaggen
+\PraesentationStartseiteUhrenturm
+\PraesentationTitelseite % Fügt die Startseite ein
+
+\begin{frame}
+	\frametitle{Overview}
+	\vspace{1cm}
+	\begin{minipage}[s]{\textwidth}
+	\tableofcontents
+	\end{minipage}
+\end{frame}
+
+\section{Union-Find}
+\begin{frame}
+\frametitle{Union-Find}
+\begin{itemize}
+	\item Models a partial equivalence relation
+over a finite domain
+	\item Implemented by disjoint set forests:
+forests of rooted trees, each tree represents equivalence class and the root a representative
+\item The graph structure is represented by an array
+	\item Supports \textbf{Union} and \textbf{Find} operations
+\end{itemize}
+\vspace{-2cm}
+\begin{figure}
+	\centering
+	\begin{minipage}{5cm}
+		\caption{Two equivalence classes}\end{minipage}
+	\begin{minipage}{8cm}\includegraphics[scale=1.0]{UnionFindFigure}\end{minipage}
+\end{figure}
+\end{frame}
+
+\subsection{Path Compression and Union by Rank}
+\begin{frame}
+\frametitle{Path Compression and Union by Rank}
+\begin{itemize}
+	\item As with many tree-based data structures, trees should be kept flat
+	\item This is done in two ways: 
+	\begin{enumerate}
+		\item \textbf{Path Compression}: When iterating to the root, update every node on the path to point to it
+		\item \textbf{Union by Rank}: When merging two trees, the root of the deeper tree becomes the new root
+	\end{enumerate}
+\end{itemize}	
+\begin{figure}
+	\centering
+	\begin{minipage}{5cm}
+		\caption{Illustration of Path Compression}\end{minipage}
+	\begin{minipage}{8cm}\includegraphics[scale=0.8]{PathCompressionFigure}\end{minipage}
+\end{figure}
+\end{frame}
+
+\subsection{Implementation}
+\begin{frame}
+	\frametitle{Implementation}
+	\begin{itemize}
+		\item The implementation is done in Imperative/HOL, which can then be exported to several languages.
+		\item The arrays used and therefore the domain are static. (The analysis can be easily adapted to dynamic arrays)
+		\item TODO: Some code snippets
+	\end{itemize}
+\end{frame}
+
+\section{History of the Proof}
+\begin{frame}
+	\frametitle{History of the Proof}
+	\begin{itemize}
+		\item There are several, slightly different results about the amortized time complexity of the operations of Union-Find
+		\item The first result involving $\alpha$ was proved by Tarjan in 1975. The proof has been simplified until the version in CLRS
+		\item In 1989 Fredman and Saks prove in some sense the optimality of the result
+		\item The latest result was published by Alstrup et al. in 2014 and tightens the bound, this is the one we prove
+		\item In 2017, Charguéraud and Pottier formalize the result in Coq
+		\item Now, we present this formalization in Isabelle/HOL
+		\item In all these proofs, but especially since Alstrup et al., most work is needed to analyze the structure abstractly before anything about an imperative program is considered
+	\end{itemize}
+\end{frame}
+
+\section{Inverses of Functions $f: \mathbb{N} \rightarrow \mathbb{N}$}
+\begin{frame}
+	\frametitle{Inverses of Functions $f: \mathbb{N} \rightarrow \mathbb{N}$}
+	\begin{minipage}[t]{0.55\linewidth}
+		\vspace{-4cm}
+	\begin{itemize}
+		\item Defined in InverseNatNat.thy
+		\item There are two possible inverses for discrete functions, an upper inverse $\alpha_f$ and a lower inverse $\beta_f$
+		\item The theory provides lemmas to change the proof obligations between them and the original function
+		\item Used to define the Inverse Ackermann Function, but also the ``index'' of a node
+	\end{itemize}
+	\end{minipage}
+\begin{minipage}[c]{0.4\linewidth}
+\includegraphics[scale=0.7]{InverseNatNatFigure}
+\end{minipage}
+\end{frame}
+
+\section{The Ackermann Function and its Inverse}
+\begin{frame}
+	\frametitle{The Ackermann Function and its Inverse}
+	\begin{itemize}
+		\item There is no single Ackermann Function ``$A$'' or inverse Ackermann Function ``$\alpha$''
+		\item All definitions share the property of growing faster than any primitive recursive function
+		\item $\alpha$ grows \textbf{very} slowly, it is less than 4 for any input smaller than the number of atoms in the universe
+		\item We use the definition of $A$ and $\alpha$ by Tarjan:
+	\end{itemize}
+\begin{minipage}{0.45\linewidth}
+\begin{dfn} Ackermann Function
+	\begin{align*}
+	A \, 0 \, x &= x + 1  \\
+	A \, (k + 1)\, x &= (A\, k)^{(x + 1)}\, x 
+	\end{align*}
+\end{dfn}
+\end{minipage}
+\begin{minipage}{0.45\linewidth}
+\begin{dfn} Inverse Ackermann Function
+	\begin{align*}
+	\alpha \, n &= \min \{ k \,\mid\, A\, k\, 1 \geq n \}\\
+	\alpha_r \, n &= 1 + \min\{ k \,\mid\, A\, k\, r \geq (n + 1) \}
+	\end{align*}
+\end{dfn}
+\end{minipage}
+
+\begin{itemize}
+	\item In Isabelle/HOL, the definitions are expressed slightly differently and make use of InverseNatNat.thy
+\end{itemize}
+\end{frame}
+
+\section{Separation Logic with Time Credits}
+\begin{frame}
+	\frametitle{Separation Logic with Time Credits}
+	\begin{itemize}
+		\item Logic to reason about mutable resources in a heap. Enables Hoare-Triple definition
+		\item It also allows for ``pure'' assertions, predicates independent of the heap content
+		\item Time Credits can also appear in assertions and are required to execute atomic operations
+		\item The components of the logic are: \begin{itemize}
+			\item $\uparrow(P)$ holds if the heap is empty and $P$ holds as a predicate.
+			\item true and false hold respectively for every heap and for no heap.
+			\item $p \mapsto_a xs$ is the ``points-to'' assertion. The memory cell at location $p$ exists, is ``owned by us'' and contains an array representing the list $xs$.
+			\item $P_1 * P_2$ is the separating conjunction. It holds if the heap can be split into two disjoint parts which respectively satisfy $P_1$ and $P_2$.
+			\item $\exists_A x.\, P$ is just existential quantification lifted to assertions.
+		\end{itemize}
+	\item The Framework by Haslbeck implementing this for Isabelle/HOL, as well as this thesis as a usage example will be published in the AFP.
+	\end{itemize}
+\end{frame}
+
+\subsection{Amortized Analysis with Time Credits}
+\begin{frame}
+	\frametitle{Amortized Analysis with Time Credits}
+	\begin{itemize}
+		\item We define a potential function $\Phi$ that measures the ``entropy'' of the data structure
+		\item The idea is to ``hide'' $\Phi$ credits in the assertion defining the data structure
+		\item If we are able to prove a Hoare-Triple of the form:
+		\begin{equation*}
+		\langle \mathrm{invar}(\mathcal{D}) * \$(\Phi(\mathcal{D})) * \$(\mathcal{O}(f)) \rangle 
+		\quad \mathtt{op}(\mathcal{D}) \quad 
+		\langle \mathrm{invar}(\mathcal{D'}) * \$(\Phi(\mathcal{D}')) \rangle
+		\end{equation*}
+		for any $\Phi$, we can conclude that the operation \texttt{op} has an amortized cost in $\mathcal{O}(f)$
+		\item How many credits are stored in $\Phi$ and how does it evolve with mutations is, together with the functional correctness of the algorithm, the purpose of the mathematical analysis required to prove the Hoare-Triple
+	\end{itemize}
+\end{frame}
+
+\section{Results of the Thesis}
+\begin{frame}
+	\frametitle{Results of the Thesis}
+	The $\,\,\mathrm{is\_uf}$ Assertion takes a relation and two arrays as arguments and ensures:\begin{itemize}
+		\item The well-formedness of the disjoint set forest and the ranks
+		\item That the relation modeled by the array is the one given
+		\item That the necessary potential is stored as Time Credits
+	\end{itemize}
+	\vspace{0.6cm}
+	\begin{dfn}
+	\begin{align}
+	\begin{split}
+	\mathrm{is\_uf}\, \mathcal{X} \, (s,p) := 
+	&\exists_A \LL\, \RR.\, p \mapsto_a \LL * s \mapsto_a \RR\, * \\
+	&\uparrow (\ufaalpha = \mathcal{X} \land \mathrm{invar\_rank}\, \LL \, \RR)\, * \\
+	&\$(4\cdot\Philr)
+	\end{split}
+	\end{align}
+	\end{dfn}
+\vspace{-0.5cm}
+\begin{itemize}
+	\item The definition of the potential function $\Phi$ is involved and not very intuitive
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+	\frametitle{Results of the Thesis}
+	\vspace{0.6cm}
+	\begin{minipage}{0.48\linewidth}
+\begin{lma}
+	\begin{equation*}
+	\mathrm{uf\_cmp\_time}\, \in \mathcal{O}(\alpha_r\,n)
+	\end{equation*}
+\end{lma}
+
+\begin{thm}
+	\,\newline
+	\begin{align*}
+	\begin{split}
+	\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * &\$(\mathrm{uf\_cmp\_time}\, |\mathrm{Dom}\, \mathcal{X}|)\rangle \quad \\ 
+	&\mathtt{uf\_cmp}\, u\, i\, j\\
+	&\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * \uparrow(r \leftrightarrow (i,j)\in\mathcal{X}) \rangle_t
+	\end{split}
+	\end{align*}
+\end{thm}
+	\end{minipage}
+	\begin{minipage}{0.40\linewidth}
+\begin{lma}
+	\begin{equation*}
+	\mathrm{uf\_union\_time}\, \in \mathcal{O}(\alpha_r\,n)
+	\end{equation*}
+\end{lma}
+\begin{thm}\,\newline
+	\textbf{Assumes: } $i,j \in \mathrm{Dom}\, \mathcal{R}$
+	\begin{align*}
+	\begin{split}
+	\langle \mathrm{is\_uf}\, \mathcal{X}\, u\, * &\$(\mathrm{uf\_union\_time}\, |\mathrm{Dom}\, \mathcal{X}|)\rangle \quad \\
+	&\mathtt{uf\_union}\, u\, i\, j\\
+	&\langle \mathrm{is\_uf}\, (\mathrm{per\_union}\, \mathcal{X}\, i\, j)\rangle_t
+	\end{split}
+	\end{align*}
+\end{thm}
+\end{minipage}
+\vspace{-0.4cm}
+\begin{itemize}
+	\item \texttt{uf\_union} corresponds to the \textbf{Union} and \texttt{uf\_cmp} to the \textbf{Find} operation
+	\item These theorems follow from abstract results about disjoint set forests
+	\item The whole proof is about 5KLoc long in Isabelle/HOL
+\end{itemize}
+\end{frame}
+
+\section{Timeline of the Project}
+\begin{frame}
+	\frametitle{Timeline of the Project}
+	\vspace{-0.7cm}
+	\begin{table}
+		\centering
+		\begin{minipage}[t]{\linewidth}
+			\color{gray}
+			\ytl{May}{Background work: Familiarisation with Sepreftime and the paper by Charguéraud and Pottier}
+			\vspace{-0.1cm}
+			\ytl{May 15th}{Official thesis registration}
+						\vspace{-0.1cm}
+			\ytl{June}{Cleanup of the previous work by Lammich and Haslbeck}
+						\vspace{-0.1cm}
+			\ytl{June 5th}{Armaël Guéneau visits TUM}
+						\vspace{-0.1cm}
+			\ytl{June}{\textbf{Bottom-up}: Ackermann and InverseNatNat theories and important definitions}
+						\vspace{-0.1cm}
+			\ytl{July}{First abstract proofs: rank, level, index}
+						\vspace{-0.1cm}
+			\ytl{July 16th}{\textbf{Top-down}: Sanity check of definitions done, skipping the rest and proof of the Hoare-Triples}
+						\vspace{-0.1cm}
+			\ytl{August}{Exam phase}
+						\vspace{-0.1cm}
+			\ytl{September}{Parallel writing of the thesis, proof gap-filling and correction of definitions}
+						\vspace{-0.1cm}
+			\ytl{September 8th}{Complete sound theory}
+						\vspace{-0.1cm}
+			\ytl{Semptember 13th}{Submission of the thesis}
+						\vspace{-0.1cm}
+			\bigskip
+		\end{minipage}%
+	\end{table}
+\end{frame}
+
+\section{Conclusions}
+\begin{frame}
+	\frametitle{Conclusions}
+	\begin{itemize}
+		\item TODO: Some adaptation of the conclusions of the thesis.
+	\end{itemize}
+\end{frame}
+
+\PraesentationMasterKopfzeileDreizeiler
+\begin{frame}
+\frametitle{\,}
+\Huge Thank You for listening! \newline
+\Huge Any questions?
+\end{frame}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{document} % !!! NICHT ENTFERNEN !!!
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

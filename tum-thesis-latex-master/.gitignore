@@ -1,4 +1,4 @@
 /build/*
 /logos/*.pdf
 /main*
-
+!main.tex
