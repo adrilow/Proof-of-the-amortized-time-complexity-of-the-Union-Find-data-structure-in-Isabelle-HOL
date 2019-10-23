@@ -33,8 +33,8 @@ Supervisor: Prof. Tobias Nipkow, Ph.D. {\newline} Advisor: Maximilian P.L. Haslb
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FOLIENSTIL: Standard
 % !!!ÄNDERUNG HIER:!!!
-%\PraesentationMasterStandard
-\PraesentationMasterKopfzeileDreizeiler
+\PraesentationMasterStandard
+%\PraesentationMasterKopfzeileDreizeiler
 %\PraesentationMasterWeissBlau
 
 %\PraesentationStartseiteFlaggen
@@ -55,8 +55,7 @@ Supervisor: Prof. Tobias Nipkow, Ph.D. {\newline} Advisor: Maximilian P.L. Haslb
 \begin{itemize}
 	\item Models a partial equivalence relation
 over a finite domain
-	\item Implemented by disjoint set forests:
-forests of rooted trees, each tree represents equivalence class and the root a representative
+	\item Implemented by disjoint set forests
 \item The graph structure is represented by an array
 	\item Supports \textbf{Union} and \textbf{Find} operations
 \end{itemize}
@@ -76,8 +75,8 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 	\item As with many tree-based data structures, trees should be kept flat
 	\item This is done in two ways: 
 	\begin{enumerate}
-		\item \textbf{Path Compression}: When iterating to the root, update every node on the path to point to it
-		\item \textbf{Union by Rank}: When merging two trees, the root of the deeper tree becomes the new root
+		\item \textbf{Path Compression}
+		\item \textbf{Union by Rank}
 	\end{enumerate}
 \end{itemize}	
 \begin{figure}
@@ -88,13 +87,20 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 \end{figure}
 \end{frame}
 
-\subsection{Implementation}
+\subsection{Design Choices}
 \begin{frame}
-	\frametitle{Implementation}
+	\frametitle{Design Choices}
 	\begin{itemize}
-		\item The implementation is done in Imperative/HOL, which can then be exported to several languages.
-		\item The arrays used and therefore the domain are static. (The analysis can be easily adapted to dynamic arrays)
-		\item TODO: Some code snippets
+		\item Done in Imperative/HOL, which can then be exported to several languages
+		\item The arrays used and therefore the domain are static
+		\item We define the operations in Imperative/HOL:
+		\begin{itemize}
+			\item \includegraphics{RepofDef}
+			\item \includegraphics{CompressDef}
+			\item \includegraphics{RepofcDef}
+			\item \includegraphics{CmpDef}
+			\item \includegraphics{UnionBigDef.png}
+		\end{itemize}
 	\end{itemize}
 \end{frame}
 
@@ -102,14 +108,58 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 \begin{frame}
 	\frametitle{History of the Proof}
 	\begin{itemize}
-		\item There are several, slightly different results about the amortized time complexity of the operations of Union-Find
-		\item The first result involving $\alpha$ was proved by Tarjan in 1975. The proof has been simplified until the version in CLRS
-		\item In 1989 Fredman and Saks prove in some sense the optimality of the result
-		\item The latest result was published by Alstrup et al. in 2014 and tightens the bound, this is the one we prove
+		\item Several, slightly different results about the amortized time complexity of the operations of Union-Find
+		\item The first result involving $\alpha$ by Tarjan in 1975. The proof was simplified until the version in CLRS
+		\item In 1989 Fredman and Saks prove (in some sense) the optimality of the result
+		\item The latest result by Alstrup et al. in 2014 tightens the bound
 		\item In 2017, Charguéraud and Pottier formalize the result in Coq
 		\item Now, we present this formalization in Isabelle/HOL
-		\item In all these proofs, but especially since Alstrup et al., most work is needed to analyze the structure abstractly before anything about an imperative program is considered
+		\item In all these proofs, but especially since Alstrup et al., most work is needed for the abstract analysis
 	\end{itemize}
+\end{frame}
+
+\section{Timeline of the Project}
+\begin{frame}
+	\frametitle{Timeline of the Project}
+	\vspace{-0.7cm}
+	\begin{table}
+		\centering
+		\begin{minipage}[t]{\linewidth}
+			\color{gray}
+			\ytl{May}{Background work: Familiarisation with Sepreftime and the paper by Charguéraud and Pottier}
+			\vspace{-0.1cm}
+			\ytl{May 15th}{Official thesis registration}
+			\vspace{-0.1cm}
+			\ytl{June}{Cleanup of the previous work by Lammich and Haslbeck}
+			\vspace{-0.1cm}
+			\ytl{June 5th}{Armaël Guéneau visits TUM}
+			\vspace{-0.1cm}
+			\ytl{June}{\textbf{Bottom-up}: Ackermann and InverseNatNat theories and important definitions}
+			\vspace{-0.1cm}
+			\ytl{July}{First abstract proofs: rank, level, index}
+			\vspace{-0.1cm}
+			\ytl{July 16th}{\textbf{Top-down}: Sanity check of definitions done, skipping the rest and proof of the Hoare-Triples}
+			\vspace{-0.1cm}
+			\ytl{August}{Exam phase}
+			\vspace{-0.1cm}
+			\ytl{September}{Parallel writing of the thesis, proof gap-filling and correction of definitions}
+			\vspace{-0.1cm}
+			\ytl{September 8th}{Complete sound theory}
+			\vspace{-0.1cm}
+			\ytl{Semptember 13th}{Submission of the thesis}
+			\vspace{-0.1cm}
+			\bigskip
+		\end{minipage}%
+	\end{table}
+\end{frame}
+
+\section{Overview of the Isabelle Proof}
+\begin{frame}
+	\frametitle{Overview}
+	\vspace{-2.5cm}
+	\begin{figure}
+		\includegraphics[scale=0.8]{OverviewFigure}
+	\end{figure}
 \end{frame}
 
 \section{Inverses of Functions $f: \mathbb{N} \rightarrow \mathbb{N}$}
@@ -119,9 +169,9 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 		\vspace{-4cm}
 	\begin{itemize}
 		\item Defined in InverseNatNat.thy
-		\item There are two possible inverses for discrete functions, an upper inverse $\alpha_f$ and a lower inverse $\beta_f$
-		\item The theory provides lemmas to change the proof obligations between them and the original function
-		\item Used to define the Inverse Ackermann Function, but also the ``index'' of a node
+		\item Upper inverse $\alpha_f$ and Lower inverse $\beta_f$
+		\item Lemmas to change the proof obligations between inverses and the original function
+		\item Used for Inverse Ackermann Function, but also the ``index'' of a node
 	\end{itemize}
 	\end{minipage}
 \begin{minipage}[c]{0.4\linewidth}
@@ -135,7 +185,7 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 	\begin{itemize}
 		\item There is no single Ackermann Function ``$A$'' or inverse Ackermann Function ``$\alpha$''
 		\item All definitions share the property of growing faster than any primitive recursive function
-		\item $\alpha$ grows \textbf{very} slowly, it is less than 4 for any input smaller than the number of atoms in the universe
+		\item $\alpha$ grows \textbf{very} slowly
 		\item We use the definition of $A$ and $\alpha$ by Tarjan:
 	\end{itemize}
 \begin{minipage}{0.45\linewidth}
@@ -160,6 +210,33 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 \end{itemize}
 \end{frame}
 
+\begin{frame}
+	\frametitle{The Ackermann Function and its Inverse}
+	\vspace{0.6cm}
+	\begin{lma}{observable\_universe\_$\alpha$}
+		\newline
+		\textbf{Assume:} $n \leq 10^{80} $
+		\begin{equation}
+		\alpha \, n \leq 4 \label{universealpha}
+		\end{equation}
+	\end{lma}	
+\begin{itemize}
+	\item $10^{80}$ is an estimate of the number of atoms in the universe
+\end{itemize}
+
+\begin{lma}{$\alpha$\_n\_0\_$\alpha$\_logn}
+	\newline
+	\textbf{Assume:} $16 \leq n$
+	\begin{equation}
+	\alpha \, n \leq 1 + (\alpha \, (\log{n}))
+	\end{equation}
+\end{lma}
+\begin{itemize}
+	\item $\alpha$ and $\alpha(\log\, n)$ are asymptotically equivalent
+	\item True for every primitive recursive strictly monotonic function
+\end{itemize}
+\end{frame}
+
 \section{Separation Logic with Time Credits}
 \begin{frame}
 	\frametitle{Separation Logic with Time Credits}
@@ -168,11 +245,11 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 		\item It also allows for ``pure'' assertions, predicates independent of the heap content
 		\item Time Credits can also appear in assertions and are required to execute atomic operations
 		\item The components of the logic are: \begin{itemize}
-			\item $\uparrow(P)$ holds if the heap is empty and $P$ holds as a predicate.
-			\item true and false hold respectively for every heap and for no heap.
-			\item $p \mapsto_a xs$ is the ``points-to'' assertion. The memory cell at location $p$ exists, is ``owned by us'' and contains an array representing the list $xs$.
-			\item $P_1 * P_2$ is the separating conjunction. It holds if the heap can be split into two disjoint parts which respectively satisfy $P_1$ and $P_2$.
-			\item $\exists_A x.\, P$ is just existential quantification lifted to assertions.
+			\item $\uparrow(P)$ 
+			\item true and false 
+			\item $p \mapsto_a xs$ 
+			\item $P_1 * P_2$ 
+			\item $\exists_A x.\, P$ 
 		\end{itemize}
 	\item The Framework by Haslbeck implementing this for Isabelle/HOL, as well as this thesis as a usage example will be published in the AFP.
 	\end{itemize}
@@ -186,14 +263,48 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 		\item The idea is to ``hide'' $\Phi$ credits in the assertion defining the data structure
 		\item If we are able to prove a Hoare-Triple of the form:
 		\begin{equation*}
-		\langle \mathrm{invar}(\mathcal{D}) * \$(\Phi(\mathcal{D})) * \$(\mathcal{O}(f)) \rangle 
+		\langle \mathrm{invar}(\mathcal{D}) * \$(\Phi(\mathcal{D})) * \underbrace{\$(f(\mathcal{D}))}_{\text{Advertised Cost}} \rangle 
 		\quad \mathtt{op}(\mathcal{D}) \quad 
 		\langle \mathrm{invar}(\mathcal{D'}) * \$(\Phi(\mathcal{D}')) \rangle
 		\end{equation*}
-		for any $\Phi$, we can conclude that the operation \texttt{op} has an amortized cost in $\mathcal{O}(f)$
-		\item How many credits are stored in $\Phi$ and how does it evolve with mutations is, together with the functional correctness of the algorithm, the purpose of the mathematical analysis required to prove the Hoare-Triple
+		for any $\Phi$ and $f \in \mathcal{O}(g)$, we can conclude that the operation \texttt{op} has an amortized cost in $\mathcal{O}(g)$
+		\item Remaining questions: \begin{itemize}
+			\item What $\Phi$ do you choose? How does $\Phi$ evolve?
+			\item How do you prove the functional correctness? \newline
+			$\Longrightarrow$ Mathematical analysis of the data structure
+		\end{itemize}
 	\end{itemize}
 \end{frame}
+
+
+\section{The Potential Function $\Phi$}
+\begin{frame}
+	\frametitle{The Potential Function $\Phi$}	
+	\vspace{0.6cm}
+	\begin{definition}{Potential for a single node}
+		\begin{equation*}
+		\philr i :=
+		\begin{cases}
+		\alpha_r\, (\RR_r\, i) \cdot (1 + (\RR_r\, i)) & \mathrm{if}\, \LL!i=i \,   \\
+		(\alpha_r\, (\RR_r\, i) - \level i) \cdot \RR_r\, i - \iindex i + 1  &\mathrm{if}\, \alpha_r\, (\RR_r\, i) = \alpha_r\, (\RR_r\, (\LL!i))\\
+		0 & \mathrm{otherwise}
+		\end{cases}
+		\end{equation*}
+	\end{definition}
+
+\begin{definition}{Potential of the data structure}
+	\begin{equation}
+	\Philr :=  \sum_{i = 0}^{|\LL| - 1}{\philr i}
+	\end{equation}
+\end{definition}
+
+\begin{itemize}
+	\item $\{0,\dots, |\LL|-1\}$ is in this case the domain of our equivalence relation
+\end{itemize}
+
+	
+\end{frame}
+
 
 \section{Results of the Thesis}
 \begin{frame}
@@ -215,9 +326,6 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 	\end{align}
 	\end{dfn}
 \vspace{-0.5cm}
-\begin{itemize}
-	\item The definition of the potential function $\Phi$ is involved and not very intuitive
-\end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -266,54 +374,54 @@ forests of rooted trees, each tree represents equivalence class and the root a r
 \end{itemize}
 \end{frame}
 
-\section{Timeline of the Project}
-\begin{frame}
-	\frametitle{Timeline of the Project}
-	\vspace{-0.7cm}
-	\begin{table}
-		\centering
-		\begin{minipage}[t]{\linewidth}
-			\color{gray}
-			\ytl{May}{Background work: Familiarisation with Sepreftime and the paper by Charguéraud and Pottier}
-			\vspace{-0.1cm}
-			\ytl{May 15th}{Official thesis registration}
-						\vspace{-0.1cm}
-			\ytl{June}{Cleanup of the previous work by Lammich and Haslbeck}
-						\vspace{-0.1cm}
-			\ytl{June 5th}{Armaël Guéneau visits TUM}
-						\vspace{-0.1cm}
-			\ytl{June}{\textbf{Bottom-up}: Ackermann and InverseNatNat theories and important definitions}
-						\vspace{-0.1cm}
-			\ytl{July}{First abstract proofs: rank, level, index}
-						\vspace{-0.1cm}
-			\ytl{July 16th}{\textbf{Top-down}: Sanity check of definitions done, skipping the rest and proof of the Hoare-Triples}
-						\vspace{-0.1cm}
-			\ytl{August}{Exam phase}
-						\vspace{-0.1cm}
-			\ytl{September}{Parallel writing of the thesis, proof gap-filling and correction of definitions}
-						\vspace{-0.1cm}
-			\ytl{September 8th}{Complete sound theory}
-						\vspace{-0.1cm}
-			\ytl{Semptember 13th}{Submission of the thesis}
-						\vspace{-0.1cm}
-			\bigskip
-		\end{minipage}%
-	\end{table}
-\end{frame}
-
 \section{Conclusions}
 \begin{frame}
 	\frametitle{Conclusions}
 	\begin{itemize}
-		\item TODO: Some adaptation of the conclusions of the thesis.
+		\item Formalization of the state-of-the-art result about Union-Find
+		\item Comprehensive theory about Ackermann, including quantitative and asymptotic results
+		\item The proofs of the imperative programs are still too long:
+		 \begin{itemize}
+			\item The automation does not deal well with arithmetic
+			\item It also instantiates existentials too aggressively
+			\item Repetitive proofs generated by branching $\Longrightarrow$ optimization possible
+		\end{itemize}
+		\item Formal verification of non-trivial results about runtime, not only correctness are possible 
+		\item Some overhead, but this helps to reveal hidden assumptions 
 	\end{itemize}
 \end{frame}
 
-\PraesentationMasterKopfzeileDreizeiler
+%\PraesentationMasterKopfzeileDreizeiler
 \begin{frame}
 \frametitle{\,}
 \Huge Thank You for listening! \newline
 \Huge Any questions?
+\end{frame}
+
+\begin{frame}
+	\frametitle{Important Definitions}
+	\vspace{1cm}
+	\begin{definition}{invar\_rank}
+		\begin{align}
+		\mathrm{invar\_rank}\, \LL \, \RR := 
+		&\mathrm{ufa\_invar} \, \LL \, \land \\
+		&|\LL| = |\RR| \, \land \\
+		&(\forall (i,j) \in \ufabstart. \, \RR!i < \RR!j) \\
+		&(\forall i < |\LL|.\, \LL!i = i \longrightarrow 2^{\RR!i} \leq |\mathrm{descendants}_\LL \, i|)
+		\end{align}
+	\end{definition}
+	\begin{definition}{ufa\_invar}
+	\begin{equation}
+	\mathrm{ufa\_invar} \, \LL \, := \forall i < |\LL|.\, i \in \mathrm{Dom}\, \repof \land \LL!i < |\LL|
+	\end{equation}
+	\end{definition}
+
+\begin{definition}{ufa\_$\beta$\_start}
+\begin{equation}
+\ufabstart := \{(x,y) \,\mid\, x<|\LL| \land y<|\LL| \land x \neq y \land \LL!x = y \}
+\end{equation}
+\end{definition}
+
 \end{frame}
 
 
