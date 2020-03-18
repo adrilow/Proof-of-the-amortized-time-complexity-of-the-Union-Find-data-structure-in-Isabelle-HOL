@@ -1,12 +1,12 @@
 theory Union_Find_Time_alpha_abstract_analysis
 
 imports 
-  "SeprefTime.SepLog_Automatic" 
+  "SepAuto_Time.SepLog_Automatic" 
   "SeprefTime.Refine_Automation" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
   SepLogicTime_RBTreeBasic.Asymptotics_1D
-  UnionFind_Impl
+  "SeprefTime.UnionFind_Impl"
   Ackermann
 begin
 
@@ -564,18 +564,19 @@ lemma ufa_union_on_path:
   qed
 
 
-lemma hel: "(\<And>x. x\<in>A \<Longrightarrow> f x \<le> g x) \<Longrightarrow> finite A  \<Longrightarrow> MAXIMUM A f \<le> MAXIMUM A g"  
+lemma hel: "(\<And>x. x\<in>A \<Longrightarrow> f x \<le> g x) \<Longrightarrow> finite A  \<Longrightarrow> Max (f ` A) \<le> Max (g ` A)"  
   by (smt Max_ge_iff Max_in finite_imageI imageE image_eqI image_is_empty order_refl)  
-lemma MAXIMUM_mono: "(\<And>x. x\<in>A \<Longrightarrow> f x \<le> g x) \<Longrightarrow> finite A  \<Longrightarrow> A = B \<Longrightarrow> MAXIMUM A f \<le> MAXIMUM B g"  
+lemma MAXIMUM_mono: "(\<And>x. x\<in>A \<Longrightarrow> f x \<le> g x) \<Longrightarrow> finite A  \<Longrightarrow> A = B \<Longrightarrow> Max (f ` A) \<le> Max (g ` B)"  
   using hel by blast 
-lemma MAXIMUM_eq: "(\<And>x. x\<in>A \<Longrightarrow> f x = g x) \<Longrightarrow> finite A  \<Longrightarrow> A = B \<Longrightarrow> MAXIMUM A f = MAXIMUM B g"  
+lemma MAXIMUM_eq: "(\<And>x. x\<in>A \<Longrightarrow> f x = g x) \<Longrightarrow> finite A  \<Longrightarrow> A = B \<Longrightarrow> Max (f ` A) =  Max (g ` B)"  
   apply(rule antisym) by  (auto intro: MAXIMUM_mono)
 
 
 
 
 
-lemma h_of_alt: "h_of l i = MAXIMUM {j|j. j<length l \<and> rep_of l j = i} (height_of l)"
+
+lemma h_of_alt: "h_of l i = Max ((height_of l) ` {j|j. j<length l \<and> rep_of l j = i})"
   unfolding h_of_def 
   by (simp add: setcompr_eq_image) 
  
@@ -585,6 +586,7 @@ lemma h_of_compress: "ufa_invar l \<Longrightarrow> j < length l \<Longrightarro
   apply(rule MAXIMUM_mono)
   subgoal apply(rule ufa_compress_compresses) by auto
   by (auto simp add: ufa_compress_aux(2))   
+
 
 
 lemma h_of_uf_union_untouched:
@@ -600,7 +602,7 @@ lemma h_of_uf_union_untouched:
 lemma Suc_h_of: assumes
   a:  "i < length l " "rep_of l i = i"
   shows 
-  "Suc (h_of l i) = MAXIMUM {j|j. j<length l \<and> rep_of l j = i} (\<lambda>j. Suc (height_of l j))"
+  "Suc (h_of l i) = Max ((\<lambda>j. Suc (height_of l j)) ` {j|j. j<length l \<and> rep_of l j = i}) "
   unfolding h_of_alt  
   apply(subst  mono_Max_commute[where f=Suc]) 
   subgoal by (simp add: mono_Suc)
@@ -609,7 +611,7 @@ lemma Suc_h_of: assumes
   by (simp add: image_image) 
 
 lemma MAXIMUM_Un: "finite A \<Longrightarrow> finite B \<Longrightarrow> A \<noteq> {} \<Longrightarrow> B \<noteq> {} 
-  \<Longrightarrow> MAXIMUM (A \<union> B) f = max (MAXIMUM A f) (MAXIMUM B f)"
+  \<Longrightarrow> Max (f` (A \<union> B) ) = max (Max (f`A)) (Max (f`B) )"
   apply(simp add: image_Un)
   apply(subst Max_Un) by auto
 
@@ -644,16 +646,16 @@ proof -
   have B: "?B = {j |j. j < length l \<and> rep_of l j = rep_of l x}"
     using ufa_union_aux assms by auto
 
-  have "h_of (ufa_union l x y) i = MAXIMUM {j|j. j<length (ufa_union l x y) \<and> rep_of (ufa_union l x y) j = i} (height_of (ufa_union l x y))"
+  have "h_of (ufa_union l x y) i = Max ( (height_of (ufa_union l x y)) `{j|j. j<length (ufa_union l x y) \<and> rep_of (ufa_union l x y) j = i})"
     unfolding h_of_alt by simp
-  also have "\<dots> = MAXIMUM (?A \<union> ?B) (height_of (ufa_union l x y))"
+  also have "\<dots> = Max ((height_of (ufa_union l x y))` (?A \<union> ?B) )"
     unfolding * by simp
-  also have "\<dots> = max (MAXIMUM ?A (height_of (ufa_union l x y))) (MAXIMUM ?B (height_of (ufa_union l x y)))"
+  also have "\<dots> = max (Max ( (height_of (ufa_union l x y))`?A)) (Max ( (height_of (ufa_union l x y))`?B))"
     apply(subst MAXIMUM_Un) apply simp_all
     subgoal  apply(rule exI[where x=y]) using assms by (simp add: ufa_union_aux)  
     subgoal  apply(rule exI[where x=x]) using assms by (simp add: ufa_union_aux)  
     done
-  also have "\<dots> \<le> max (MAXIMUM ?A (height_of l)) (MAXIMUM ?B (\<lambda>j. Suc (height_of l j)))"
+  also have "\<dots> \<le> max (Max ( (height_of l) ` ?A)) (Max ( (\<lambda>j. Suc (height_of l j)) `?B))"
     apply(rule max.mono)
     subgoal apply(rule MAXIMUM_mono)
       subgoal apply(rule order_eq_refl) apply(rule ufa_union_not_on_path_stays) using assms by auto  
@@ -1585,7 +1587,7 @@ qed
 
 section {*Lemmas about paths and inavriants under compression (UnionFind04Compress)*}
 
-no_notation Ref.update ("_ := _" 62)
+no_notation Ref_Time.update ("_ := _" 62)
 lemma compress_preserves_other_edges:
   assumes "(v,w)\<in> (ufa_\<beta>_start l)" "v\<noteq>x"
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))"
@@ -1600,7 +1602,7 @@ lemma compress_preserves_roots:
   assumes "r = l!r"
   shows "r = l[x:=rep_of l x] ! r"
   using assms apply (cases "r = x") apply auto using rep_of_refl list_update_id by metis
-notation Ref.update ("_ := _" 62)
+notation Ref_Time.update ("_ := _" 62)
 
 lemma ancestors_step:
   assumes "ufa_invar l" "i<length l" 
@@ -1651,7 +1653,7 @@ next
 qed
 end
 
-no_notation Ref.update ("_ := _" 62)
+no_notation Ref_Time.update ("_ := _" 62)
   
 lemma ufa_compress_generalized:
   assumes I: "ufa_invar l"
@@ -1787,7 +1789,7 @@ proof -
   show ?thesis using G H unfolding ufa_invar_def by blast
 qed
 
-notation Ref.update ("_ := _" 62)
+notation Ref_Time.update ("_ := _" 62)
 
 
 context 
@@ -2896,7 +2898,7 @@ next
 qed
 
 
-no_notation Ref.update ("_ := _" 62)
+no_notation Ref_Time.update ("_ := _" 62)
 
 lemma compress_preserves_roots_other_than_x:
   assumes "r\<noteq>x" "r=l!r"
@@ -3074,7 +3076,7 @@ next
     by (metis list_update_swap rtrancl.simps step.prems(1))
 qed
 
-notation Ref.update ("_ := _" 62)
+notation Ref_Time.update ("_ := _" 62)
 
 lemma fw_ipc_compress:
   assumes "ufa_invar l" "(x,y)\<in>(ufa_\<beta>_start l)" "fw_ipc l y i l'"
@@ -3110,7 +3112,7 @@ next
       fw_ipc_compress[OF step(4) step(1) step(3)[OF step(4)]] sg1 by argo
 qed
 
-no_notation Ref.update ("_ := _" 62)
+no_notation Ref_Time.update ("_ := _" 62)
 
 lemma bw_ipc_compress_preliminary:
   assumes "ufa_invar l" "bw_ipc lxz y i lxz'"  "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "lxz = (l[x:=z])" 
@@ -3173,7 +3175,7 @@ next
   with step show ?case using BWIPCStep rep_of_idx unfolding ufa_\<beta>_start_def by auto
 qed
 
-notation Ref.update ("_ := _" 62)
+notation Ref_Time.update ("_ := _" 62)
 
 
 \<comment>\<open>One probably needs the lemmas of this file (equivalence of the two, properties about
@@ -3461,7 +3463,7 @@ context \<comment>\<open>Preservation\<close>
       (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> 
         \<Longrightarrow> ok (l[x:= z]) rkl v"
 begin
-no_notation Ref.update ("_ := _" 62)
+no_notation Ref_Time.update ("_ := _" 62)
 
 
 
@@ -3555,7 +3557,7 @@ proof -
 qed
 
 
-notation Ref.update ("_ := _" 62)
+notation Ref_Time.update ("_ := _" 62)
 end \<comment>\<open>Preservation\<close>
 
 end \<comment>\<open>Pleasant\<close>

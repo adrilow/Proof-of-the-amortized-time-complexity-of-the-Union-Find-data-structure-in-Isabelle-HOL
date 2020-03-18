@@ -11,7 +11,7 @@ definition is_uf :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" w
 
 
 lemma of_list_rule':
-    "<$ (1 + n)> Array.of_list [0..<n] <\<lambda>r. r \<mapsto>\<^sub>a [0..<n]>"
+    "<$ (1 + n)> Array_Time.of_list [0..<n] <\<lambda>r. r \<mapsto>\<^sub>a [0..<n]>"
   using of_list_rule[of "[0..<n]"] by auto 
 
 lemma height_of_init: "j<n \<Longrightarrow> height_of [0..<n] j = 0"
@@ -176,6 +176,7 @@ definition uf_cmp_time :: "nat \<Rightarrow> nat" where "uf_cmp_time n = 10+ hei
 lemma uf_cmp_time_bound[asym_bound]: 
   "uf_cmp_time \<in> \<Theta>(\<lambda>n. ln n)" unfolding uf_cmp_time_def by auto2 
 
+thm uf_rep_of_c_rule_ub
 lemma uf_cmp_rule:
   "<is_uf R u * $(uf_cmp_time (card (Domain R)))> uf_cmp u i j <\<lambda>r. is_uf R u * \<up>(r\<longleftrightarrow>(i,j)\<in>R)>\<^sub>t" 
   unfolding uf_cmp_def is_uf_def uf_cmp_time_def
@@ -193,8 +194,8 @@ lemma uf_cmp_rule:
   apply (drule cnv_to_ufa_\<alpha>_eq, simp_all)
   apply (drule cnv_to_ufa_\<alpha>_eq, simp_all)
   apply (subst ufa_find_correct)
-  apply (auto simp add: )
-  done 
+     apply (auto simp add: )
+  sorry 
   
 
 subsubsection{*uf_union_lemmas*}

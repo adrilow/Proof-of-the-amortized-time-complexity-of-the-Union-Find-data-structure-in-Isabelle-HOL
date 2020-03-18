@@ -13,7 +13,7 @@ definition is_uf :: "(nat\<times>nat) set \<Rightarrow> uf \<Rightarrow> assn" w
 
 
 lemma of_list_rule':
-    "<$ (1 + n)> Array.of_list [0..<n] <\<lambda>r. r \<mapsto>\<^sub>a [0..<n]>"
+    "<$ (1 + n)> Array_Time.of_list [0..<n] <\<lambda>r. r \<mapsto>\<^sub>a [0..<n]>"
   using of_list_rule[of "[0..<n]"] by auto 
 
 
@@ -30,9 +30,7 @@ lemma ufa_\<beta>_init_simp: "ufa_\<beta> [0..<n] = {}"
   by simp
 
 lemma ufa_\<beta>_init_simp': "trans  {(x, y). x < length [0..<n] \<and> y = x}"
-   apply rule
-  apply auto
-  done
+  by rule  auto 
 
 lemma ufa_\<beta>_init_simp'':"{(x, y). x < length [0..<n] \<and> y = x} = {(x, y). x < length [0..<n] \<and> y = x}\<^sup>+"
   using Transitive_Closure.trancl_id[OF ufa_\<beta>_init_simp', of n, symmetric ] .
@@ -43,15 +41,15 @@ lemma ufa_\<beta>_init_desc: "i<n \<Longrightarrow> descendants [0..<n] i = {i}"
 
 
 lemma ufa_init_invar': "invar_rank [0..<n] (replicate n 0)"
-  unfolding invar_rank_def apply auto 
+  unfolding invar_rank_def apply safe 
   proof goal_cases
     case 1
     then show ?case unfolding ufa_invar_def
       by (simp add: ufa_init_invar ufa_invarD(1))
   next
-    case (2 i)
-    then show ?case using ufa_\<beta>_init_desc[OF 2] by auto
- qed
+    case (4 i)
+    then show ?case using ufa_\<beta>_init_desc by auto
+ qed auto
 
 lemma zero_is_least_of_nat:
   assumes "P (0::nat)" shows "Least P = 0"
@@ -101,41 +99,19 @@ definition uf_init_time :: "nat \<Rightarrow> nat" where "uf_init_time n \<equiv
 lemma uf_init_bound[asym_bound]: "uf_init_time \<in> \<Theta>(\<lambda>n. n)" 
   unfolding uf_init_time_def by auto2
 
-lemma Array_new_rule'[sep_heap_rules]: "<$ (n + 1) * true> Array.new n x <\<lambda>r. r \<mapsto>\<^sub>a replicate n x>\<^sub>t"
+lemma Array_new_rule'[sep_heap_rules]: "<$ (n + 1) * true> Array_Time.new n x <\<lambda>r. r \<mapsto>\<^sub>a replicate n x>\<^sub>t"
   by sep_auto
-
-lemmas \<Phi>_simp[simp del]
-
-lemma uf_init_rule':
-    "<$(uf_init_time n)> uf_init n <is_uf {(i,i) |i. i<n}  >\<^sub>t"
-  unfolding uf_init_time_def uf_init_def is_uf_def[abs_def]
-  apply (vcg)
-   apply (sep_auto heap: of_list_rule')
-  apply (vcg)
-  apply clarsimp
-  apply (sep_auto (nopre) (nopost) simp: ufa_init_invar)
-  apply clarsimp
-  apply (vcg)
-  apply clarsimp 
-proof goal_cases
-  case (1 x xa)
-  have sep1: "( x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 *
-    $ (n * 14 + 9) \<Longrightarrow>\<^sub>A
-    x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * true * $ (8 * n)) 
-      = ( x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * $ (n * 14 + 9 + 0) \<Longrightarrow>\<^sub>A
-    x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0  * $ (8 * n + 0) * true)" by auto
-
-have " x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 *  $ (n * 14 + 9) \<Longrightarrow>\<^sub>A
-       x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0 * true * $ (\<Phi> [0..<n] (replicate n 0) * 4) *
-       \<up> (ufa_invar [0..<n] \<and> ufa_\<alpha> [0..<n] = {(i, i) |i. i < n}
-       \<and> length (replicate n 0) = length [0..<n] \<and> invar_rank [0..<n] (replicate n 0))"
-  apply (auto simp add: ufa_init_invar ufa_init_correct ufa_init_invar' \<Phi>_init_value) 
-  apply (subst sep1)
-  apply (rule gc_time'[of "n * 14 + 9" "8*n" "x \<mapsto>\<^sub>a [0..<n] * xa \<mapsto>\<^sub>a replicate n 0" 0])
-  unfolding time_credit_ge_def by auto
-  then show ?case by sep_auto
-qed
   
+
+lemmas \<Phi>_simp[simp del]  
+lemma uf_init_rule':
+    "<$(uf_init_time n)> uf_init n <is_uf {(i,i) |i. i<n}  >\<^sub>t" 
+  unfolding uf_init_time_def uf_init_def is_uf_def[abs_def] 
+  apply (sep_auto heap: of_list_rule' eintros del: exI) 
+  thm new_rule
+  apply(rule exI[where x="[0..<n]"])  
+  apply(rule exI[where x="replicate n 0"]) 
+  by (sep_auto simp add: ufa_init_invar ufa_init_correct ufa_init_invar' \<Phi>_init_value )
 
 subsubsection{*uf_rep_of lemmas*}
 
@@ -192,7 +168,7 @@ next
     then show ?case using BWIPCStep(1,2,4,5,6) ipcx by sep_auto
   next
     case 2
-    with 2 show ?case using \<open>x<length l\<close> apply vcg   apply safe 
+    with 2 show ?case using \<open>x<length l\<close> apply SepLog_Automatic.vcg   apply safe 
       apply (sep_auto heap: IH) proof goal_cases
       case (1 h)
       hence "x<length l'" using \<open>x<length l\<close> by argo
@@ -223,22 +199,23 @@ lemma uf_compress_same_rule:
   
 
 
-lemma uf_rep_of_c_rule_explicit: "\<lbrakk>invar_rank l rkl; i<length l; bw_ipc l i d l'\<rbrakk> \<Longrightarrow>
-  <p\<mapsto>\<^sub>al * $(4+d*4)> uf_rep_of_c p i <\<lambda>r.  p\<mapsto>\<^sub>al' 
+lemma uf_rep_of_c_rule_explicit:
+  assumes "invar_rank l rkl" "i<length l" "bw_ipc l i d l'"
+  shows"<p\<mapsto>\<^sub>al * $(4+d*4)>
+             uf_rep_of_c p i 
+        <\<lambda>r. p\<mapsto>\<^sub>al' 
     * \<up>(r=rep_of l i \<and> invar_rank l' rkl
        \<and> length l' = length l 
        \<and> (\<forall>i<length l. rep_of l' i = rep_of l i))>\<^sub>t"
-proof goal_cases
-  case 1
-  note assms= 1
-  have "ufa_invar l" using invar_rank_ufa_invarI[OF 1(1)] .
-  show ?case unfolding uf_rep_of_c_def 
+proof -
+  have "ufa_invar l" using invar_rank_ufa_invarI[OF assms(1)] .
+  show ?thesis unfolding uf_rep_of_c_def 
     apply (subst height_of_ipc_equiv[OF assms(3) \<open>ufa_invar l\<close> assms(2)])
     using assms \<open>ufa_invar l\<close>
-    apply (vcg heap: uf_rep_of_rule)
-    apply safe
+    apply (sep_auto heap: uf_rep_of_rule) 
     apply (subst height_of_ipc_equiv[OF assms(3) \<open>ufa_invar l\<close> assms(2), symmetric])
-    apply (vcg heap: uf_compress_rule_explicit[where d = d]) by sep_auto
+     apply (sep_auto heap: uf_compress_rule_explicit[where d = d])
+    by sep_auto
 qed
 
 definition uf_rep_of_c_time where "uf_rep_of_c_time n = 2 * \<alpha>\<^sub>r (n + (\<rho> - 1)) + 4"
@@ -259,7 +236,7 @@ proof goal_cases
   (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l)) - (4 * \<Phi> l' rkl + d * 4 + 4))" 
     using add_diff_inverse[OF potentialjump', symmetric] .
   show ?case apply (subst sep) 
-    apply (vcg heap: uf_rep_of_c_rule_explicit[where d=d, where rkl =rkl,where  l' = l'])
+    apply (SepLog_Automatic.vcg heap: uf_rep_of_c_rule_explicit[where d=d, where rkl =rkl,where  l' = l'])
     using 1 bw apply auto 
     apply (subst (10) mult.commute)
     by sep_auto
@@ -276,7 +253,7 @@ lemma "(\<lambda>x. 20  + 8 * real (\<alpha> (x + 1)))
 
 lemma uf_rep_of_c_time2_asym: "uf_rep_of_c_time2 \<in> \<Theta>(\<lambda>n. \<alpha> n)"
   unfolding uf_rep_of_c_time2_def using alphar_one[OF \<rho>_gt_0 ] \<rho>_def apply simp
-  apply auto2\<close>
+  apply auto2 \<close>
 
 lemma uf_rep_of_c_rule2: "\<lbrakk>invar_rank l rkl; i<length l\<rbrakk> \<Longrightarrow>
   <p\<mapsto>\<^sub>al * $(\<Phi> l rkl * 4 + uf_rep_of_c_time2 (length l)) > uf_rep_of_c p i <\<lambda>r.\<exists>\<^sub>A l'. p\<mapsto>\<^sub>al' 
@@ -314,7 +291,7 @@ proof goal_cases
         (8 * uf_rep_of_c_time (length l) + 39) + 1" by algebra
   from 1 show ?case
     unfolding uf_cmp_time_def uf_cmp_def
-    apply vcg
+    apply SepLog_Automatic.vcg
      apply (subst sum1) apply (subst time_credit_add[of "(4 * \<Phi> l rkl +
         (8 * uf_rep_of_c_time (length l) + 39))" 1])
      apply (sep_auto heap: length_rule)
@@ -342,17 +319,17 @@ proof goal_cases
    $ (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l))) *
    $ (uf_rep_of_c_time (length l) * 4 + 39 )" by simp
       have "i<x" "j<x" using False by auto
-      with \<open>invar_rank l rkl\<close> show ?thesis apply auto apply vcg 
+      with \<open>invar_rank l rkl\<close> show ?thesis apply auto apply SepLog_Automatic.vcg 
          apply (subst sum2)
          apply (subst sep2)
          apply (subst sep3)
          apply (subst sep4)
          apply (rule frame_rule[of "p \<mapsto>\<^sub>a l * $ (4 * (\<Phi> l rkl + uf_rep_of_c_time (length l)))" "uf_rep_of_c p i"
               _ "$ (uf_rep_of_c_time (length l) * 4 + 39)" ] )
-         apply (vcg heap: uf_rep_of_c_rule''' )
-        apply vcg apply auto proof goal_cases
+         apply (SepLog_Automatic.vcg heap: uf_rep_of_c_rule''' )
+        apply SepLog_Automatic.vcg apply auto proof goal_cases
         case (1 x')
-        then show ?case apply (vcg (ss)) apply (vcg (ss)) 
+        then show ?case apply (SepLog_Automatic.vcg (ss)) apply (SepLog_Automatic.vcg (ss)) 
         proof goal_cases
           case (1 l')
           hence inv:"invar_rank l' rkl" by blast
@@ -363,21 +340,20 @@ proof goal_cases
                 = p \<mapsto>\<^sub>a l' *        $ (4 * (\<Phi> l' rkl + uf_rep_of_c_time (length l'))) * ($(39) * true)"        
             by (simp add: time_credit_add)
           from 1 ll' inv show ?case apply (subst sum3) apply (subst (asm) ll')+ apply (subst ll')+
-            apply vcg apply (subst sep5)
+            apply SepLog_Automatic.vcg apply (subst sep5)
              apply (rule frame_rule[of "p \<mapsto>\<^sub>a l' * $ (4 * (\<Phi> l' rkl + uf_rep_of_c_time (length l')))"
                   "uf_rep_of_c p j" _ " ($ 39 * true)"])
-             apply (vcg heap: uf_rep_of_c_rule''' )
-            apply vcg
+             apply (SepLog_Automatic.vcg heap: uf_rep_of_c_rule''' )
+            apply SepLog_Automatic.vcg
             apply auto
-            apply vcg
+            apply SepLog_Automatic.vcg
             apply auto proof goal_cases
             case (1 l'')
             have "p \<mapsto>\<^sub>a l'' * true * $ (\<Phi> l'' rkl * 4 + 38) \<Longrightarrow>\<^sub>A
   p \<mapsto>\<^sub>a l'' * true * $ (4 * \<Phi> l'' rkl) *
   \<up> (invar_rank l'' rkl \<and>
      length l'' = length l' \<and>
-     (\<forall>i<length l'. rep_of l'' i = rep_of l i))" using 1 apply sep_auto
-              by (smt assn_times_assoc gc_time le_add1 match_first merge_true_star mult.commute)
+     (\<forall>i<length l'. rep_of l'' i = rep_of l i))" using 1 by sep_auto
             then  show ?case using ent_ex_postI by fast 
           qed 
         qed
@@ -433,7 +409,7 @@ proof goal_cases
   then show ?case proof (cases "i< length l \<and> j < length l")
     case True
     then show ?thesis using 1  unfolding ufa_\<alpha>_def 
-      apply (vcg heap: uf_cmp_rule')
+      apply (SepLog_Automatic.vcg heap: uf_cmp_rule')
       apply auto apply (subst ex_assn_swap)
       apply (rule ent_ex_postI[where x = rkl]) apply (subst ufa_\<alpha>_def[symmetric])+
       by (sep_auto simp: ufa_\<alpha>I)
@@ -444,7 +420,7 @@ proof goal_cases
     have "i \<ge> length l \<or> j \<ge> length l" using False by auto
     with 1 show ?thesis unfolding uf_cmp_def uf_cmp_time_def 
       apply (subst sum1)
-      apply (vcg heap: length_rule)
+      apply (SepLog_Automatic.vcg heap: length_rule)
       apply sep_auto proof goal_cases
       case (1 xa h)
       hence iDom: "i\<notin> Domain R" using 1 ufa_\<alpha>_dom by auto
@@ -491,8 +467,8 @@ proof goal_cases
   } note card_swap = this
   case assms:(1 a b)
   then show ?case 
-    apply (vcg (ss))
-    apply (vcg (ss))
+    apply (SepLog_Automatic.vcg (ss))
+    apply (SepLog_Automatic.vcg (ss))
   proof goal_cases
     case first_ex:(1 l rkl)
     hence "i<length l" using ufa_\<alpha>_dom[of l] by auto
@@ -501,21 +477,21 @@ proof goal_cases
     show ?case
       unfolding uf_union_time_def apply (subst card_swap[OF \<open>ufa_\<alpha> l = R\<close>])
       using  first_ex
-      apply (vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l rkl\<close> \<open>i<length l\<close>, of b])
+      apply (SepLog_Automatic.vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l rkl\<close> \<open>i<length l\<close>, of b])
       apply safe
     proof goal_cases
       case second_ex: (1 b' ba x)
-      then show ?case apply (vcg (ss)) proof goal_cases
+      then show ?case apply (SepLog_Automatic.vcg (ss)) proof goal_cases
         case second_ex': (1 l')
         hence "invar_rank l' rkl" by fast
         from second_ex' have "j<length l'" unfolding ufa_\<alpha>_def by auto
         from second_ex' have "length l = length l'" by argo
         show ?case apply (subst \<open>length l = length l'\<close>)
           using second_ex' 
-          apply (vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l' rkl\<close> \<open>j<length l'\<close>, of b])
+          apply (SepLog_Automatic.vcg heap: uf_rep_of_c_rule2[OF \<open>invar_rank l' rkl\<close> \<open>j<length l'\<close>, of b])
           apply safe
-          apply (vcg (ss))
-          apply (vcg (ss))
+          apply (SepLog_Automatic.vcg (ss))
+          apply (SepLog_Automatic.vcg (ss))
           apply (cases "rep_of l i = rep_of l' j") proof goal_cases
           case True: (1 xa la)
           then show ?case apply sep_auto
@@ -538,20 +514,20 @@ proof goal_cases
               by (simp add: \<open>i < length l\<close>) } note repl' = this
           from False show ?case using \<open>i < length l\<close> \<open>j < length l'\<close> 
               invar_rank_ufa_invarI[OF \<open>invar_rank l rkl\<close>] rep_of_bound 
-            apply vcg
+            apply SepLog_Automatic.vcg
             apply auto
-            apply vcg
+            apply SepLog_Automatic.vcg
             apply safe
           proof goal_cases
             case res: (1 x\<^sub>3 x\<^sub>4)
             then show ?case apply (cases "rkl ! rep_of l i < x\<^sub>4") proof goal_cases
               case True2: 1
               then show ?case 
-                apply vcg
+                apply SepLog_Automatic.vcg
                 apply auto
-                apply vcg
+                apply SepLog_Automatic.vcg
                 apply auto
-                apply vcg
+                apply SepLog_Automatic.vcg
                 apply auto
               proof goal_cases
                 case x34: 1
@@ -647,15 +623,15 @@ proof goal_cases
             next
               case False2: 2
               then show ?case
-                apply vcg
+                apply SepLog_Automatic.vcg
                 apply (cases "rkl ! rep_of l i = rkl ! rep_of l j") proof goal_cases
                 case True3: 1
                 then show ?case 
-                  apply vcg
+                  apply SepLog_Automatic.vcg
                   apply auto
-                  apply vcg
+                  apply SepLog_Automatic.vcg
                   apply auto
-                  apply vcg
+                  apply SepLog_Automatic.vcg
                   apply auto
                 proof goal_cases
                   case 1
@@ -769,9 +745,9 @@ proof goal_cases
               next
                 case False3: 2
                 then show ?case
-                  apply vcg
+                  apply SepLog_Automatic.vcg
                   apply auto
-                  apply vcg
+                  apply SepLog_Automatic.vcg
                   apply auto
                 proof goal_cases
                   case 1

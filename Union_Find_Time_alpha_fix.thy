@@ -24,8 +24,8 @@ text_raw\<open>\DefineSnippet{uf_init}{\<close>
 
 definition uf_init :: "nat \<Rightarrow> uf Heap" where 
   "uf_init n \<equiv> do {
-    l \<leftarrow> Array.of_list [0..<n];
-    szl \<leftarrow> Array.new n (0::nat);
+    l \<leftarrow> Array_Time.of_list [0..<n];
+    szl \<leftarrow> Array_Time.new n (0::nat);
     return (szl,l)
   }"
 
@@ -33,22 +33,22 @@ text_raw\<open>}\<close>
 
 text_raw\<open>\DefineSnippet{uf_cmp}{\<close>
 
-partial_function (heap) uf_rep_of :: "nat array \<Rightarrow> nat \<Rightarrow> nat Heap" 
+partial_function (heap_time) uf_rep_of :: "nat array \<Rightarrow> nat \<Rightarrow> nat Heap" 
   where [code]: 
   "uf_rep_of p i = do {
-    n \<leftarrow> Array.nth p i;
+    n \<leftarrow> Array_Time.nth p i;
     if n=i then return i else uf_rep_of p n
   }"
 
 
-partial_function (heap) uf_compress :: "nat \<Rightarrow> nat \<Rightarrow> nat array \<Rightarrow> unit Heap" 
+partial_function (heap_time) uf_compress :: "nat \<Rightarrow> nat \<Rightarrow> nat array \<Rightarrow> unit Heap" 
   where [code]: 
   "uf_compress i ci p = (
     if i=ci then return ()
     else do {
-      ni\<leftarrow>Array.nth p i;
+      ni\<leftarrow>Array_Time.nth p i;
       uf_compress ni ci p;
-      Array.upd i ci p;
+      Array_Time.upd i ci p;
       return ()
     })"
 
@@ -63,7 +63,7 @@ definition uf_rep_of_c :: "nat array \<Rightarrow> nat \<Rightarrow> nat Heap"
 definition uf_cmp :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool Heap" where 
   "uf_cmp u i j \<equiv> do {
     let (s,p)=u;
-    n\<leftarrow>Array.len p;
+    n\<leftarrow>Array_Time.len p;
     if (i\<ge>n \<or> j\<ge>n) then return False
     else do {
       ci\<leftarrow>uf_rep_of_c p i;
@@ -82,15 +82,15 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
     cj \<leftarrow> uf_rep_of p j;
     if (ci=cj) then return (s,p) 
     else do {
-      si \<leftarrow> Array.nth s ci;
-      sj \<leftarrow> Array.nth s cj;
+      si \<leftarrow> Array_Time.nth s ci;
+      sj \<leftarrow> Array_Time.nth s cj;
       if si<sj then do {
-        Array.upd ci cj p;
-        Array.upd cj (si+sj) s;
+        Array_Time.upd ci cj p;
+        Array_Time.upd cj (si+sj) s;
         return (s,p)
       } else do { 
-        Array.upd cj ci p;
-        Array.upd ci (si+sj) s;
+        Array_Time.upd cj ci p;
+        Array_Time.upd ci (si+sj) s;
         return (s,p)
       }
     }
@@ -106,18 +106,18 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
     cj \<leftarrow> uf_rep_of_c p j;
     if (ci=cj) then return (r,p) 
     else do {
-      ri \<leftarrow> Array.nth r ci;
-      rj \<leftarrow> Array.nth r cj;
+      ri \<leftarrow> Array_Time.nth r ci;
+      rj \<leftarrow> Array_Time.nth r cj;
       if ri<rj then do {
-        Array.upd ci cj p;
+        Array_Time.upd ci cj p;
         (if (ri=rj) then do {
-            Array.upd cj (ri+1) r
+            Array_Time.upd cj (ri+1) r
            } else return r);
          return (r,p)
       } else do { 
-        Array.upd cj ci p;
+        Array_Time.upd cj ci p;
         if (ri=rj) then do {
-            Array.upd ci (ri+1) r;
+            Array_Time.upd ci (ri+1) r;
             return (r,p)
         } else return (r,p)
       }

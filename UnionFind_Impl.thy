@@ -1,5 +1,5 @@
 theory UnionFind_Impl
-imports  "../../Refine_Imperative_HOL/Sepref" UnionFind  
+imports  "SeprefTime.Sepref" UnionFind  
 begin
 
 section "Union find Implementation"
