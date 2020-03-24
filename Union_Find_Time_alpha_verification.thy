@@ -237,13 +237,6 @@ lemma per_union_union_by_rank_l:
   unfolding union_by_rank_l_def 
   by (auto simp: ufa_union_rep_of[symmetric] ufa_union_correct intro: rep_of_bound)
 
-lemma union_by_rank_l_length[simp]:
-      "length (union_by_rank_l l rkl i j) = length l"
-  by (auto simp: union_by_rank_l_def)
-
-lemma union_by_rank_rkl_length[simp]:
-      "length (union_by_rank_rkl rkl i j) = length rkl"
-  by (auto simp: union_by_rank_rkl_def)
 
 
 lemma 
