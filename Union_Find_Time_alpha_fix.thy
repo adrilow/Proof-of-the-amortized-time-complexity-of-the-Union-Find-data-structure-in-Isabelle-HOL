@@ -110,9 +110,6 @@ definition uf_union :: "uf \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uf 
       rj \<leftarrow> Array_Time.nth r cj;
       if ri<rj then do {
         Array_Time.upd ci cj p;
-        (if (ri=rj) then do {
-            Array_Time.upd cj (ri+1) r
-           } else return r);
          return (r,p)
       } else do { 
         Array_Time.upd cj ci p;

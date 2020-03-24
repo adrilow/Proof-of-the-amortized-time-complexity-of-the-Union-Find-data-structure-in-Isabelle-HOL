@@ -11,27 +11,28 @@ imports
 begin
 
 notation timeCredit_assn  ("$") 
+no_notation Ref_Time.update ("_ := _" 62)
 
-text {*
+text \<open>
   We implement a simple union-find data-structure based on an array.
   It uses path compression and a size-based union heuristics.
-*}
+\<close>
 
-subsection {* Abstract Union-Find on Lists *}
-text {*
+subsection \<open> Abstract Union-Find on Lists \<close>
+text \<open>
   We first formulate union-find structures on lists, and later implement 
   them using Imperative/HOL. This is a separation of proof concerns
   between proving the algorithmic idea correct and generating the verification
   conditions.
-*}
+\<close>
 
-subsubsection {* Representatives *}
-text {*
+subsubsection \<open> Representatives \<close>
+text \<open>
   We define a function that searches for the representative of an element.
   This function is only partially defined, as it does not terminate on all
   lists. We use the domain of this function to characterize valid union-find 
   lists. 
-*}
+\<close>
 function (domintros) rep_of 
   where "rep_of l i = (if l!i = i then i else rep_of l (l!i))"
   by pat_completeness auto
@@ -41,8 +42,8 @@ root: "l!i = i \<Longrightarrow> is_repr l i i"
 |child: "is_repr l (l!i) j \<Longrightarrow> is_repr l i j"
 
 
-text {* A valid union-find structure only contains valid indexes, and
-  the @{text "rep_of"} function terminates for all indexes. *}
+text \<open> A valid union-find structure only contains valid indexes, and
+  the @{text "rep_of"} function terminates for all indexes. \<close>
 definition 
   "ufa_invar l \<equiv> \<forall>i<length l. rep_of_dom (l,i) \<and> l!i<length l"
 
@@ -51,7 +52,7 @@ lemma ufa_invarD:
   "\<lbrakk>ufa_invar l; i<length l\<rbrakk> \<Longrightarrow> l!i<length l" 
   unfolding ufa_invar_def by auto
 
-text {* We derive the following equations for the @{text "rep-of"} function. *}
+text \<open> We derive the following equations for the @{text "rep-of"} function. \<close>
 lemma rep_of_refl: "l!i=i \<Longrightarrow> rep_of l i = i"
   apply (subst rep_of.psimps)
   apply (rule rep_of.domintros)
@@ -70,8 +71,8 @@ lemma rep_of_iff: "\<lbrakk>ufa_invar l; i<length l\<rbrakk>
   \<Longrightarrow> rep_of l i = (if l!i=i then i else rep_of l (l!i))"
   by (simp add: rep_of_simps)
 
-text {* We derive a custom induction rule, that is more suited to
-  our purposes. *}
+text \<open> We derive a custom induction rule, that is more suited to
+  our purposes. \<close>
 lemma rep_of_induct[case_names base step, consumes 2]:
   assumes I: "ufa_invar l" 
   assumes L: "i<length l"
@@ -87,7 +88,7 @@ proof -
   thus ?thesis using I L by simp
 qed
 
-text {* In the following, we define various properties of @{text "rep_of"}. *}
+text \<open> In the following, we define various properties of @{text "rep_of"}. \<close>
 lemma rep_of_min: 
   "\<lbrakk> ufa_invar l; i<length l \<rbrakk> \<Longrightarrow> l!(rep_of l i) = rep_of l i"
 proof -
@@ -163,7 +164,7 @@ next
 qed
 
 
-subsubsection {* Abstraction to Partial Equivalence Relation *}
+subsubsection \<open> Abstraction to Partial Equivalence Relation \<close>
 definition ufa_\<alpha> :: "nat list \<Rightarrow> (nat\<times>nat) set" 
   where "ufa_\<alpha> l 
     \<equiv> {(x,y). x<length l \<and> y<length l \<and> rep_of l x = rep_of l y}"
@@ -176,6 +177,10 @@ lemma ufa_\<alpha>_equiv[simp, intro!]: "part_equiv (ufa_\<alpha> l)"
   apply (rule transI)
   apply auto
   done
+
+
+lemma ufa_\<alpha>I: "(\<forall>i<length l. rep_of l' i = rep_of l i) \<Longrightarrow> (length l = length l') \<Longrightarrow> (ufa_\<alpha> l' = ufa_\<alpha> l)"
+  unfolding ufa_\<alpha>_def by auto
 
 lemma ufa_\<alpha>_lenD: 
   "(x,y)\<in>ufa_\<alpha> l \<Longrightarrow> x<length l"
@@ -197,7 +202,7 @@ lemma ufa_\<alpha>_len_eq:
   shows "length l = length l'"
   by (metis assms le_antisym less_not_refl linorder_le_less_linear ufa_\<alpha>_refl)
 
-subsubsection {* Operations *}
+subsubsection \<open> Operations \<close>
 lemma ufa_init_invar: "ufa_invar [0..<n]"
   unfolding ufa_invar_def
   by (auto intro: rep_of.domintros)
@@ -382,7 +387,11 @@ lemma ufa_compress_correct:
   shows "ufa_\<alpha> (l[x := rep_of l x]) = ufa_\<alpha> l"
   by (auto simp: ufa_\<alpha>_def ufa_compress_aux[OF I])
 
-
+lemma ufa_compress_rep_of:
+  assumes "ufa_invar l" "x<length l" "u=rep_of l x"
+  shows "\<And>i. i<length l \<Longrightarrow> rep_of (l[x := u]) i = rep_of l i"
+  using ufa_compress_aux assms 
+  by auto
 
 subsubsection \<open>stuff about the height (by Max Haslbeck)\<close>
 
@@ -703,9 +712,9 @@ proof -
   finally show ?thesis .
 qed
 
-section{*Stuff about the rank (TODO) (by Adrián Löwenberg)*}
+section\<open>Stuff about the rank (TODO) (by Adrián Löwenberg)\<close>
 
-subsection{*Definitions*}
+subsection\<open>Definitions\<close>
 
 definition \<rho> where "\<rho> \<equiv> 1::nat "
 
@@ -839,7 +848,7 @@ lemma edges_have_distinct_endpoints:
   shows "i\<noteq>j"
   using assms unfolding ufa_\<beta>_start_def by blast
 
-subsubsection{*Closures with distances*}
+subsubsection\<open>Closures with distances\<close>
 
 inductive kpath 
   for r :: "('a \<times> 'a) set"
@@ -913,6 +922,10 @@ lemma ancestors_of_parent_inclusion:
   by auto
 
 
+lemma ufa_\<beta>_init_desc: "i<n \<Longrightarrow> descendants [0..<n] i = {i}" 
+  unfolding descendants_def ufa_\<beta>_start_def 
+  by auto (metis (no_types, lifting) case_prodE mem_Collect_eq nth_upt_zero rtrancl.cases upt_zero_length)
+ 
 
 definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> length l = length rkl 
                             \<and> (\<forall>i j. i< length l \<and> j< length l \<and> l!i=j \<and>  i\<noteq>j \<longrightarrow> rkl ! i < rkl ! j) 
@@ -922,10 +935,12 @@ definition invar_rank where "invar_rank l rkl \<equiv> (ufa_invar l \<and> lengt
 
 definition invar_rank' where "invar_rank' l rkl \<equiv> ufa_invar l \<and> invar_rank l rkl"
 
-subsection{*Lemmas About the rank from UnionFind11Rank, UnionFind21Parent and UnionFind41Potential*}
+subsection\<open>Lemmas About the rank from UnionFind11Rank, UnionFind21Parent and UnionFind41Potential\<close>
 
 lemma invar_rank_ufa_invarI: "invar_rank l rkl \<Longrightarrow> ufa_invar l" unfolding invar_rank_def by blast
 
+lemma ufa_init_invar_rank: "invar_rank [0..<n] (replicate n 0)"
+  by(auto simp: invar_rank_def ufa_init_invar ufa_\<beta>_init_desc)
 
 lemma parent_has_nonzero_rank: assumes "invar_rank l rkl" "l!i = j" "i < length l" "j < length l" "i\<noteq>j"
    shows "0<rkl!j"
@@ -1273,7 +1288,7 @@ lemma \<alpha>\<^sub>r_rankr_grows_along_edges_corollary:
   using \<alpha>\<^sub>r_rankr_grows_along_edges[OF assms(1-3)] assms(4) by linarith
 
 
-section{*Level: Definition and Lemmas*}
+section\<open>Level: Definition and Lemmas\<close>
 \<comment>\<open>The level of @{term i} is defined as one plus the @{term "Greatest k"} such that
    @{term "Ackermann k (rankr rkl i)"} is less than or equal to @{term "rankr rkl (l!i)"}.\<close>
 
@@ -1356,7 +1371,7 @@ lemma rankr_parent_i_lt: "rankr rkl (l!i) < Ackermann level (rankr rkl i)"
   unfolding prek_def by blast
 
 
-section{*Index: Definition and Lemmas*}
+section\<open>Index: Definition and Lemmas\<close>
 
 \<comment>\<open> The index of @{term i} is defined as the largest @{term j} such that @{term j} 
   iterations of @{term "Ackermann prek"} take us from @{term "rankr rkl i"} 
@@ -1423,7 +1438,7 @@ end
 end
 
 
-section{*Potential function \<Phi> of the whole Union Find data structure*}
+section\<open>Potential function \<Phi> of the whole Union Find data structure\<close>
 
 definition \<phi> where "\<phi> l rkl i \<equiv> if  l!i = i
                     then \<alpha>\<^sub>r (rankr rkl i) * Suc (rankr rkl i)
@@ -1536,7 +1551,7 @@ lemma \<phi>_upper_bound:
 qed
 
 
-section{*Lemmas about \<Phi>, i.e. about the whole Union Find data structure*}
+section\<open>Lemmas about \<Phi>, i.e. about the whole Union Find data structure\<close>
 
 lemma \<Phi>_empty:
   "\<Phi> [] [] = 0"
@@ -1558,7 +1573,7 @@ qed
 \<comment>\<open>The next lemma in Coq (\<Phi>_extend) doesn't apply to our model with a fixed domain\<close>
 
 
-section{*Lemmas about parents during ufa_union and compression (UnionFind22ParentEvolution)*}
+section\<open>Lemmas about parents during ufa_union and compression (UnionFind22ParentEvolution)\<close>
 
 \<comment>\<open>During a union, a vertex v which already has a parent keeps this parent.\<close>
 
@@ -1585,9 +1600,9 @@ proof -
   thus ?thesis using assms  \<open>rep_of l x = x\<close> by auto
 qed
 
-section {*Lemmas about paths and inavriants under compression (UnionFind04Compress)*}
+section \<open>Lemmas about paths and inavriants under compression (UnionFind04Compress)\<close>
 
-no_notation Ref_Time.update ("_ := _" 62)
+
 lemma compress_preserves_other_edges:
   assumes "(v,w)\<in> (ufa_\<beta>_start l)" "v\<noteq>x"
   shows "(v,w)\<in>(ufa_\<beta>_start (l[x:= z]))"
@@ -1602,7 +1617,6 @@ lemma compress_preserves_roots:
   assumes "r = l!r"
   shows "r = l[x:=rep_of l x] ! r"
   using assms apply (cases "r = x") apply auto using rep_of_refl list_update_id by metis
-notation Ref_Time.update ("_ := _" 62)
 
 lemma ancestors_step:
   assumes "ufa_invar l" "i<length l" 
@@ -1653,7 +1667,6 @@ next
 qed
 end
 
-no_notation Ref_Time.update ("_ := _" 62)
   
 lemma ufa_compress_generalized:
   assumes I: "ufa_invar l"
@@ -1789,7 +1802,6 @@ proof -
   show ?thesis using G H unfolding ufa_invar_def by blast
 qed
 
-notation Ref_Time.update ("_ := _" 62)
 
 
 context 
@@ -1946,10 +1958,10 @@ end \<comment>\<open>x_edge_y\<close>
 
 
 
-section{*Notion of state evolution over time (UnionFind13RankLink, UnionFind23Evolution)*}
+section\<open>Notion of state evolution over time (UnionFind13RankLink, UnionFind23Evolution)\<close>
 
 
-subsubsection{*UnionFind13RankLink*}
+subsubsection\<open>UnionFind13RankLink\<close>
 definition union_by_rank_l where "union_by_rank_l l rkl x y \<equiv> if (rkl!x < rkl!y) 
                                   then (ufa_union l x y) else (ufa_union l y x)"
 
@@ -2221,7 +2233,7 @@ lemma dsf_per_add_edge_by_rank: "False" oops
 is useful to have some explicit lemmas about rep_of under union_by_rank\<close>
 
 
-subsection{*UnionFind23Evolution*}
+subsection\<open>UnionFind23Evolution\<close>
 
 inductive evolution
 for l::"nat list" and rkl::"nat list"
@@ -2314,7 +2326,7 @@ qed
 
 end  \<comment>\<open>StudyOfEvolution\<close>
 
-section {*Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)*}
+section \<open>Lemmas about \<Phi> under compression (UnionFind42PotentialCompress)\<close>
 
 \<comment>\<open>During a compression, the level function is unchanged at ancestors of y\<close>
 
@@ -2422,7 +2434,7 @@ proof -
 qed
 
 
-section{*Evolution of level, index and potential over time (UnionFind43PotentialAnalysis)*}
+section\<open>Evolution of level, index and potential over time (UnionFind43PotentialAnalysis)\<close>
 
 lemma lexpo_well_defined:
   assumes "(k::nat) < a" "i\<le>r"
@@ -2811,7 +2823,7 @@ proof -
         union_by_rank_l_def union_by_rank_rkl_def)
 qed
 
-section{*Abstract definition of iterated path compression (UnionFind05IteratedCompression)*}
+section\<open>Abstract definition of iterated path compression (UnionFind05IteratedCompression)\<close>
 
 \<comment>\<open> We now define an inductive predicate that encodes the process of performing
    path compression iteratively along a path, up to the root. ipc stands for
@@ -2898,7 +2910,6 @@ next
 qed
 
 
-no_notation Ref_Time.update ("_ := _" 62)
 
 lemma compress_preserves_roots_other_than_x:
   assumes "r\<noteq>x" "r=l!r"
@@ -3076,7 +3087,6 @@ next
     by (metis list_update_swap rtrancl.simps step.prems(1))
 qed
 
-notation Ref_Time.update ("_ := _" 62)
 
 lemma fw_ipc_compress:
   assumes "ufa_invar l" "(x,y)\<in>(ufa_\<beta>_start l)" "fw_ipc l y i l'"
@@ -3112,7 +3122,6 @@ next
       fw_ipc_compress[OF step(4) step(1) step(3)[OF step(4)]] sg1 by argo
 qed
 
-no_notation Ref_Time.update ("_ := _" 62)
 
 lemma bw_ipc_compress_preliminary:
   assumes "ufa_invar l" "bw_ipc lxz y i lxz'"  "(y,x)\<notin> (ufa_\<beta>_start l)\<^sup>*" "lxz = (l[x:=z])" 
@@ -3175,7 +3184,6 @@ next
   with step show ?case using BWIPCStep rep_of_idx unfolding ufa_\<beta>_start_def by auto
 qed
 
-notation Ref_Time.update ("_ := _" 62)
 
 
 \<comment>\<open>One probably needs the lemmas of this file (equivalence of the two, properties about
@@ -3185,7 +3193,7 @@ notation Ref_Time.update ("_ := _" 62)
 
 
 
-section{*Lemmas about pleasantness (UnionFind24Pleasant)*}
+section\<open>Lemmas about pleasantness (UnionFind24Pleasant)\<close>
 
 \<comment>\<open> This section defines the notion of ``pleasantness'' -- the property of having
    a proper non-root ancestor with the same level -- and establishes several
@@ -3463,7 +3471,6 @@ context \<comment>\<open>Preservation\<close>
       (y,v)\<in> (ufa_\<beta>_start l)\<^sup>*; v\<noteq>l!v; ok l rkl v \<rbrakk> 
         \<Longrightarrow> ok (l[x:= z]) rkl v"
 begin
-no_notation Ref_Time.update ("_ := _" 62)
 
 
 
@@ -3556,8 +3563,7 @@ proof -
   by blast
 qed
 
-
-notation Ref_Time.update ("_ := _" 62)
+ 
 end \<comment>\<open>Preservation\<close>
 
 end \<comment>\<open>Pleasant\<close>

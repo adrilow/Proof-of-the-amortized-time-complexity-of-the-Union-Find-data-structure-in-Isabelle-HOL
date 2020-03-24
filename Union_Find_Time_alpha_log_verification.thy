@@ -183,8 +183,9 @@ lemma uf_cmp_rule:
   apply (sep_auto heap: uf_rep_of_c_rule_ub length_rule dest: ufa_\<alpha>_lenD simp: not_le split: prod.split)
    apply(rule fi_rule[OF uf_rep_of_c_rule_ub]) defer defer defer
       apply(simp only: mult.assoc)
-  apply(rule match_first) apply sep_auto
-      apply(timeframeinf)
+  apply(rule match_first)      
+      apply simp 
+      apply(time_frame_inference)
      defer apply simp apply simp apply simp
   apply(sep_auto) 
   apply (drule cnv_to_ufa_\<alpha>_eq, simp_all)
@@ -194,8 +195,7 @@ lemma uf_cmp_rule:
   apply (drule cnv_to_ufa_\<alpha>_eq, simp_all)
   apply (drule cnv_to_ufa_\<alpha>_eq, simp_all)
   apply (subst ufa_find_correct)
-     apply (auto simp add: )
-  sorry 
+  by (auto simp add: ) 
   
 
 subsubsection{*uf_union_lemmas*}
