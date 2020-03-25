@@ -6,7 +6,6 @@ imports
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
   SepLogicTime_RBTreeBasic.Asymptotics_1D
-  "SeprefTime.UnionFind_Impl"
   Ackermann
 begin
 

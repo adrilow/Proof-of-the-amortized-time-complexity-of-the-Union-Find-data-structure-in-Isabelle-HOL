@@ -1,10 +1,20 @@
 theory MaxNode_Impl
-  imports Union_Find_Time Kruskal_Impl "SepLogicTime_RBTreeBasic.MergeSort_Impl"
-  "../Remdups"
+  imports 
+    Kruskal_Impl "SepLogicTime_RBTreeBasic.MergeSort_Impl"
+  "SeprefTime.Remdups"
 begin  
 
 
 datatype wrap = W (extr: "(nat \<times> int \<times> nat)")
+
+
+instantiation wrap :: zero
+begin
+definition zero_wrap where "zero_wrap = W (0,0,0)"
+
+instance ..
+
+end
 
 instantiation wrap :: linorder
 begin
@@ -37,7 +47,7 @@ instance wrap :: heap
 fun maxn' :: "wrap array \<Rightarrow> nat \<Rightarrow> nat Heap" where
   "maxn' p 0 = return 0"
 |  "maxn' p (Suc n) = do {
-       l \<leftarrow> Array.nth p n;
+       l \<leftarrow> Array_Time.nth p n;
       (case l of W (a,w,b) \<Rightarrow> do { 
             mn \<leftarrow> maxn' p n;
             return (max mn (max a b))
@@ -70,7 +80,7 @@ next
     apply(rule arg_cong[where f="Max"]) by auto 
 qed
 
-definition "maxn p = do { l \<leftarrow> Array.len p; maxn' p l }"
+definition "maxn p = do { l \<leftarrow> Array_Time.len p; maxn' p l }"
 
 lemma maxn_rule: "<p\<mapsto>\<^sub>axs * timeCredit_assn(length xs*2+2)> maxn p <\<lambda>r. p\<mapsto>\<^sub>axs *  \<up>(r=maxnode  (map extr xs))>"
   unfolding maxn_def by(sep_auto heap: maxn'_rule length_rule simp: zero_time) 
@@ -86,7 +96,7 @@ definition sortEdges'  :: "(nat \<times> int \<times> nat) list \<Rightarrow> ((
       a \<leftarrow> destroy da;
       merge_sort_impl a;
       mn \<leftarrow> maxn a; 
-      sl \<leftarrow> Array.freeze a;
+      sl \<leftarrow> Array_Time.freeze a;
       return (map extr sl, mn)
     }"
 
@@ -98,17 +108,17 @@ lemma merge_sort_time_O[asym_bound]:
   " merge_sort_time \<in> \<Theta>(\<lambda>n. n * ln n)"
   using merge_sort_time_O by auto
 
-lemma sortEdges'_time_bound[asym_bound]: "sortEdges'_time \<in> \<Theta>(\<lambda>n. n * ln n)"
+lemma sortEdges'_time_bound: "sortEdges'_time \<in> \<Theta>(\<lambda>n. n * ln n)"
   unfolding sortEdges'_time_def
   by(auto2)
 
 
 definition sortEdges  :: "(nat \<times> int \<times> nat) list \<Rightarrow> ((nat \<times> int \<times> nat) list * nat) Heap"  where
   "sortEdges l = do {
-      a \<leftarrow> Array.of_list (map W l);
+      a \<leftarrow> Array_Time.of_list (map W l);
       merge_sort_impl a;
       mn \<leftarrow> maxn a; 
-      sl \<leftarrow> Array.freeze a;
+      sl \<leftarrow> Array_Time.freeze a;
       return (map extr sl, mn)
     }"
 
@@ -119,7 +129,7 @@ definition sortEdges_time :: "nat \<Rightarrow> nat" where
 
 
 lemma of_list_map_rule: "<timeCredit_assn (1 + length xs)>
-    Array.of_list (map f xs) <\<lambda>r. r \<mapsto>\<^sub>a (map f xs)>"
+    Array_Time.of_list (map f xs) <\<lambda>r. r \<mapsto>\<^sub>a (map f xs)>"
   using of_list_rule[where xs="map f xs"]
   by auto
 
@@ -160,7 +170,7 @@ lemma extr_W_on_set: "extr ` W ` S = S"
   by (auto simp: extrW)
 
 lemma freeze_sort_maprule:
-  "<a \<mapsto>\<^sub>a sort (map f xs) * timeCredit_assn(1 + length xs)> Array.freeze a <\<lambda>r. a \<mapsto>\<^sub>a sort (map f xs) * \<up>(r = sort (map f xs))>" 
+  "<a \<mapsto>\<^sub>a sort (map f xs) * timeCredit_assn(1 + length xs)> Array_Time.freeze a <\<lambda>r. a \<mapsto>\<^sub>a sort (map f xs) * \<up>(r = sort (map f xs))>" 
   using freeze_rule[where xs="sort (map f xs)"] by auto
 
 lemma sortEdges_rule: "<timeCredit_assn(sortEdges_time (length l))> sortEdges l <\<lambda>(sl, mn). \<up>(sorted_wrt edges_less_eq sl)>\<^sub>t"
@@ -171,8 +181,8 @@ lemma sortEdges_rule2: "<timeCredit_assn(sortEdges_time (length l))> sortEdges l
   unfolding sortEdges_def  sortEdges_time_def
   apply(sep_auto heap: mergeSort_map_rule maxn_sort_maprule of_list_map_rule  freeze_sort_maprule simp: extrW sorted_wrap )
   apply(simp add: max_node_def)
-  using extr_W_on_set    
-  by (metis (no_types, lifting) image_comp) 
+  using extr_W_on_set     
+  by (simp add: image_image)   
 
 thm remdups_rule
 lemma remdup_map_rule:
@@ -219,12 +229,12 @@ lemma mergeSort_smaller_rule:
   "length ra \<le>  ll \<Longrightarrow>
   <p \<mapsto>\<^sub>a ra * timeCredit_assn(merge_sort_time ll)>
    merge_sort_impl p
-   <\<lambda>_. p \<mapsto>\<^sub>a sort ra>\<^sub>t"  
+   <\<lambda>_. p \<mapsto>\<^sub>a sort ra>\<^sub>t" 
   apply(rule ht_cons_rule[where P'="p \<mapsto>\<^sub>a ra * timeCredit_assn (merge_sort_time (length ra)) * true"])
     apply(simp only: mult.assoc)
     apply(rule match_first)  apply(rule gc_time)
   apply(rule merge_sort_time_mono) apply simp
-  defer  apply(rule fi_rule[where F=true]) apply(rule mergeSort_correct[where xs="ra"])
+  defer  apply(rule fi_rule[of _ _ _ _ true]) apply(rule mergeSort_correct[where xs="ra"])
    apply sep_auto+
   done
 
@@ -232,15 +242,15 @@ lemma maxn_sort_smallerrule: "length xs \<le> S \<Longrightarrow> <p\<mapsto>\<^
   apply(rule ht_cons_rule[where P'="p \<mapsto>\<^sub>a xs * timeCredit_assn (2*(length xs)+2) * true"])
     apply(simp only: mult.assoc)
     apply(rule match_first)  apply(rule gc_time)  apply simp
-  defer  apply(rule fi_rule[where F=true]) apply(rule maxn_rule[where xs="xs"])
+  defer  apply(rule fi_rule[of _ _ _ _ true]) apply(rule maxn_rule[where xs="xs"])
    apply sep_auto+
   done 
 
-lemma freeze_smallerrule: "length xs \<le> S \<Longrightarrow> <a \<mapsto>\<^sub>a xs * timeCredit_assn(1 + S)> Array.freeze a <\<lambda>r. a \<mapsto>\<^sub>a xs * \<up>(r = xs)>\<^sub>t"
+lemma freeze_smallerrule: "length xs \<le> S \<Longrightarrow> <a \<mapsto>\<^sub>a xs * timeCredit_assn(1 + S)> Array_Time.freeze a <\<lambda>r. a \<mapsto>\<^sub>a xs * \<up>(r = xs)>\<^sub>t"
   apply(rule ht_cons_rule[where P'="a \<mapsto>\<^sub>a xs * timeCredit_assn (1+(length xs)) * true"])
     apply(simp only: mult.assoc)
     apply(rule match_first)  apply(rule gc_time)  apply simp
-  defer  apply(rule fi_rule[where F=true]) apply(rule freeze_rule[where xs="xs"])
+  defer  apply(rule fi_rule[of _ _ _ _ true]) apply(rule freeze_rule[where xs="xs"])
    apply sep_auto+
   done 
  
@@ -248,35 +258,30 @@ lemma freeze_smallerrule: "length xs \<le> S \<Longrightarrow> <a \<mapsto>\<^su
 lemma distinct_sort: "distinct a \<Longrightarrow> distinct (sort a)"   
   by simp  
 
+
+lemma wrap_distinct_length_le:
+  "W ` set l = set ra \<Longrightarrow> distinct ra \<Longrightarrow> length ra \<le> length l"
+  by (metis distinct_length_le length_map set_map)  
+
 lemma sortEdges'_rule: "<timeCredit_assn(sortEdges'_time (length l))>
            sortEdges' l 
       <\<lambda>(sl, mn). \<up>(sorted_wrt edges_less_eq sl \<and> set l = set sl \<and> distinct sl \<and> max_node l = mn)>\<^sub>t"
   unfolding sortEdges'_def  sortEdges'_time_def
-  apply(sep_auto heap: remdup_map_rule) 
-   apply(rule fi_rule[where F="timeCredit_assn(7 + (3 * length l + ( merge_sort_time (length l))))", OF  ht_cons_rule[OF _ _ remdup_map_rule]])
-     apply (rule ent_refl) apply (rule ent_refl)
-  subgoal by (simp add: norm_assertion_simps dollarD)
-  apply(simp add: da_assn_id)                               
-  apply(sep_auto heap: destroy_rule remdup_map_rule mergeSort_map_rule maxn_sort_maprule of_list_map_rule  freeze_sort_maprule simp: sorted_wrap )
-   apply(sep_auto heap: mergeSort_smaller_rule[where ll="length l"])
-  subgoal  
-    by (metis distinct_length_le length_map set_map)  
-  apply(sep_auto heap: maxn_sort_smallerrule[where S="length l"])
-  subgoal 
-    by (metis distinct_length_le length_map set_map)  
-  apply(sep_auto heap: freeze_smallerrule[where S="length l"])
-  subgoal 
-    by (metis distinct_length_le length_map set_map)  
-  apply (sep_auto simp: sorted_wrap )
+  apply(sep_auto  simp: da_assn_id sorted_wrap wrap_distinct_length_le
+                  heap: remdup_map_rule destroy_rule freeze_sort_maprule
+                        mergeSort_map_rule maxn_sort_maprule of_list_map_rule                         
+                        mergeSort_smaller_rule[where ll="length l"]
+                        maxn_sort_smallerrule[where S="length l"]
+                        freeze_smallerrule[where S="length l"])
   subgoal 
     using extrW by blast 
   subgoal  
     using extr_W_on_set by blast   
   subgoal apply(simp add: distinct_map)  
     by (simp add: inj_onI wrap.expand)  
-  subgoal unfolding max_node_def 
-    using extr_W_on_set    
-    by (metis (no_types, lifting) image_comp)   
+  subgoal premises prems 
+    unfolding max_node_def prems(1)[symmetric]  
+    using extr_W_on_set by(simp add: image_comp) 
   done 
 
 

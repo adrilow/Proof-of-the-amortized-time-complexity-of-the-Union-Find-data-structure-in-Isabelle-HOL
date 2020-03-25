@@ -1,11 +1,22 @@
 theory Kruskal_Time
   imports MaxNode_Impl
-    Union_Find_Time
+    Union_Find_Disjoint_Sets
 begin
 
+(* TODO *)
+
+lemma uf_cmp_time_bound[asym_bound]: 
+  "uf_cmp_time \<in> \<Theta>(\<lambda>n. ln n)" \<comment>\<open> it is actually @{term "\<Theta>(\<lambda>n. \<alpha> n)"} \<close>
+  unfolding uf_cmp_time_def sorry 
+
+lemma uf_union_time_bound[asym_bound]:
+ "uf_union_time \<in> \<Theta>(\<lambda>n. ln n)" \<comment>\<open> it is actually @{term "\<Theta>(\<lambda>n. \<alpha> n)"} \<close>
+  unfolding uf_union_time_def sorry
 
 
-
+lemma sortEdges'_time_bound[asym_bound]: "sortEdges'_time \<in> \<Theta>(\<lambda>n. n * ln n)"
+  unfolding sortEdges'_time_def
+  by(auto2)
 
 locale Kruskal_final = Kruskal_intermediate  E forest connected path weight 
   for E :: "nat uprod set" and forest connected path
@@ -45,18 +56,32 @@ lemma mBT: "minBasis_time = kruskal_time getEdges_time (card E, Max V)"
   unfolding minBasis_time_def kruskal_time_def by simp
 
 
+definition "kruskal_final = kruskal' getEdges_impl uf_init uf_cmp uf_union sortEdges'"
+
+  concrete_definition (in -) kruskal_final 
+    uses Kruskal_final.kruskal_final_def
+
 lemma k_c: "<timeCredit_assn (kruskal_time getEdges_time (card E, Max V))> kruskal <\<lambda>r. \<exists>\<^sub>Ara. hr_comp (da_assn id_assn) lst_graph_rel ra r * \<up> (MST ra)>\<^sub>t"
   unfolding mBT[symmetric] using kruskal_correct_forest by simp
 
-thm sortEdges'_time_bound uf_init_bound uf_cmp_time_bound uf_union_time_bound
 
-lemma uf_init_bound[asym_bound]: "uf_init_time \<in> \<Theta>(\<lambda>n. n)" 
-  unfolding uf_init_time_def by auto2
+
+thm sortEdges'_time_bound uf_init_bound uf_cmp_time_bound uf_union_time_bound
+ 
 
 lemma (in -) kruskal_time'_bound:
   shows "kruskal_time'  \<in> \<Theta>\<^sub>2(\<lambda>(E::nat,M::nat). E * ln E + M + E * ln M )"
   unfolding kruskal_time'_def
   by (auto2)
+
+(* TODO 
+
+lemma (in -) kruskal_time'_bound:
+  shows "kruskal_time'  \<in> \<Theta>\<^sub>2(\<lambda>(E::nat,M::nat). E * ln E + M + E * \<alpha> M )"
+  unfolding kruskal_time'_def
+  by (auto2)
+
+*)
 
 lemma (in -) kruskal_time_split: "kruskal_time gt  = (\<lambda>(cE,M). gt cE) +  kruskal_time'"
   apply(rule ext) apply (simp add: kruskal_time'_def kruskal_time_def) by auto

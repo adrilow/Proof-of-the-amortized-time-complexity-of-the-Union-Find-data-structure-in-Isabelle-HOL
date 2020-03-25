@@ -1,5 +1,5 @@
 theory Kruskal_Refine
-imports Kruskal   "../../Refine_Heuristics" UnionFind
+imports Kruskal   "SeprefTime.Refine_Heuristics" UnionFind
 begin
  
 definition edges_less_eq :: "('a \<times> 'w::{linorder, ordered_comm_monoid_add} \<times> 'a) \<Rightarrow> ('a \<times> 'w \<times> 'a) \<Rightarrow> bool"
