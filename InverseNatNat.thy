@@ -5,18 +5,15 @@ theory InverseNatNat imports Main HOL.Filter begin
    \<^url>\<open>http://gallium.inria.fr/~fpottier/dev/uf/\<close>\<close>
 
 locale f_nat_nat =
-  fixes f :: "nat\<Rightarrow>nat"
+  fixes f :: "nat\<Rightarrow>'a :: {linorder, no_top}"
   assumes strict_mono_f: "strict_mono f"
     and tends_to_inf: "filterlim f at_top at_top"
-  
+
 context f_nat_nat
 begin
 
-lemma tendstoinf: "\<exists>n\<^sub>0.\<forall>n\<ge>n\<^sub>0. (f n) > K" 
-  using tends_to_inf 
-  apply (subst (asm) filterlim_at_top[of f sequentially])
-  using  eventually_at_top_linorder
-  by (meson eventually_gt_at_top eventually_sequentially)
+lemma tendstoinf: "\<exists>n\<^sub>0.\<forall>n\<ge>n\<^sub>0. (f n) > K"  
+  by (metis tends_to_inf filterlim_at_top eventually_gt_at_top eventually_at_top_linorder)  
 
 lemma mono_f: "mono f" using strict_mono_f
   by (simp add: strict_mono_mono)
@@ -30,8 +27,9 @@ proof -
 qed
 
 
-lemma betaf_bound: "\<exists>x.\<forall>y\<^sub>0. f y\<^sub>0 \<le> y \<longrightarrow> y\<^sub>0 \<le> x"
-  by (meson le_cases less_le_trans sup.strict_order_iff tendstoinf)
+lemma betaf_bound: "\<exists>x.\<forall>y\<^sub>0. f y\<^sub>0 \<le> y \<longrightarrow> y\<^sub>0 \<le> x" 
+  using strict_mono_less_eq[OF strict_mono_f]
+  by (meson order_trans alphaf_existence) 
 
 
 (* -------------------------------------------------------------------------- *)
@@ -59,7 +57,8 @@ lemma \<alpha>\<^sub>f_spec_direct_contrapositive: assumes "f x < y" shows "x < 
 proof (rule classical)
   assume assm2: "\<not> x < \<alpha>\<^sub>f y"
   hence "\<alpha>\<^sub>f y \<le> x" by simp
-  thus "x < \<alpha>\<^sub>f y" using \<alpha>\<^sub>f_spec_direct[of y x] assms by linarith
+  thus "x < \<alpha>\<^sub>f y" using \<alpha>\<^sub>f_spec_direct[of y x] assms  
+    using not_le by blast  
 qed
 
 lemma \<alpha>\<^sub>f_spec_reciprocal: assumes "y \<le> f x" shows "\<alpha>\<^sub>f y \<le> x"
@@ -68,7 +67,8 @@ lemma \<alpha>\<^sub>f_spec_reciprocal: assumes "y \<le> f x" shows "\<alpha>\<^
 lemma \<alpha>\<^sub>f_spec_reciprocal_contrapositive: assumes "x < \<alpha>\<^sub>f y" shows "f x < y"
 proof (rule classical)
   assume assm2: "\<not> f x < y"
-  hence "y \<le> f x" by linarith
+  hence "y \<le> f x" 
+    using not_le by blast  
   thus "f x < y" using \<alpha>\<^sub>f_spec_reciprocal[of y x] assms by linarith
 qed
 
@@ -81,13 +81,12 @@ lemma f_\<alpha>\<^sub>f: "y \<le> f (\<alpha>\<^sub>f y)"
 lemma \<alpha>\<^sub>f_f: "\<alpha>\<^sub>f (f x) \<le> x"
   using \<alpha>\<^sub>f_spec_reciprocal by auto
 
-lemma \<alpha>\<^sub>f_f_exact: "\<alpha>\<^sub>f (f x) = x"
-  using  strict_mono_f  f_\<alpha>\<^sub>f[of x] \<alpha>\<^sub>f_f[of x] unfolding strict_mono_def
-  by (meson f_\<alpha>\<^sub>f less_le_not_le order.not_eq_order_implies_strict)
+lemma \<alpha>\<^sub>f_f_exact: "\<alpha>\<^sub>f (f x) = x"  
+  by (meson \<alpha>\<^sub>f_f dual_order.antisym f_\<alpha>\<^sub>f strict_mono_f strict_mono_less_eq) 
 
 lemma \<alpha>\<^sub>f_mono: "mono \<alpha>\<^sub>f"
-  using \<alpha>\<^sub>f_spec_reciprocal f_\<alpha>\<^sub>f le_trans unfolding mono_def 
-  by blast
+  using \<alpha>\<^sub>f_spec_reciprocal f_\<alpha>\<^sub>f le_trans unfolding mono_def  
+  by (meson order_trans)  
 
 (* -------------------------------------------------------------------------- *)
 \<comment> \<open> Almost symmetrically, if @{term "f 0 \<le> y"} holds, then there exists a largest 
@@ -112,7 +111,8 @@ lemma \<beta>\<^sub>f_spec_direct_contrapositive: assumes "f 0 \<le> y" "y < f x
 proof (rule classical)
   assume assm2: "\<not> \<beta>\<^sub>f y < x"
   hence "x \<le> \<beta>\<^sub>f y" by simp
-  thus "\<beta>\<^sub>f y < x" using  \<beta>\<^sub>f_spec_direct[OF assms(1) \<open>x \<le> \<beta>\<^sub>f y\<close>] assms by linarith
+  thus "\<beta>\<^sub>f y < x" using  \<beta>\<^sub>f_spec_direct[OF assms(1) \<open>x \<le> \<beta>\<^sub>f y\<close>] assms
+    using not_le by blast
 qed
 
 lemma \<beta>\<^sub>f_spec_direct_contrapositive_le: assumes "f 0 \<le> y" "y < f (Suc x)" shows "\<beta>\<^sub>f y \<le> x"
@@ -149,7 +149,7 @@ lemma \<beta>\<^sub>f_mono: "\<forall>x y. (f 0 \<le> x \<and> x \<le> y) \<long
   using \<beta>\<^sub>f_spec_reciprocal f_\<beta>\<^sub>f by force
 
 (* -------------------------------------------------------------------------- *)
-section{* Relationship between \<alpha>_f and \<beta>_f *}
+section\<open> Relationship between \<alpha>_f and \<beta>_f \<close>
 (* -------------------------------------------------------------------------- *)
 
 \<comment>\<open> Because @{term f} is strictly monotonic, for a fixed @{term y}, there is at most one
@@ -173,7 +173,8 @@ lemma \<beta>\<^sub>f_le_\<alpha>\<^sub>f_equality_converse: assumes "f 0 \<le> 
 
 lemma \<beta>\<^sub>f_\<alpha>\<^sub>f_differ_by_at_most_one:
   "\<alpha>\<^sub>f y \<le> Suc (\<beta>\<^sub>f y)"
-  using Suc_n_not_le_n \<alpha>\<^sub>f_spec \<beta>\<^sub>f_spec_reciprocal nat_le_linear  by blast
+  using Suc_n_not_le_n \<alpha>\<^sub>f_spec \<beta>\<^sub>f_spec_reciprocal nat_le_linear   
+  by (meson le_cases)  
 
 lemma \<alpha>\<^sub>f_lt_\<beta>\<^sub>f: assumes "f 0 \<le> y" "y < z" shows "\<beta>\<^sub>f y < \<alpha>\<^sub>f z" 
   using \<beta>\<^sub>f_spec_direct_contrapositive assms f_\<alpha>\<^sub>f less_le_trans by blast
@@ -182,20 +183,24 @@ lemma \<beta>\<^sub>f_tends_to_infinity:
   "filterlim \<beta>\<^sub>f at_top at_top"
   apply (subst filterlim_iff)
   apply (subst eventually_sequentially)
-  using \<beta>\<^sub>f_spec_reciprocal eventually_sequentially by fast
+  using \<beta>\<^sub>f_spec_reciprocal eventually_sequentially   
+  by (meson eventually_at_top_linorder)  
 
 lemma \<alpha>\<^sub>f_tends_to_infinity:
   "filterlim \<alpha>\<^sub>f at_top at_top"
 proof -
-  have sg1: "\<And>x y. \<lbrakk>True; True; x \<le> y\<rbrakk> \<Longrightarrow> \<alpha>\<^sub>f x \<le> \<alpha>\<^sub>f y" using \<alpha>\<^sub>f_mono unfolding mono_def by blast
-  show ?thesis 
-    using filterlim_at_top_at_top
-      [where f = "\<alpha>\<^sub>f" , where g = "f", where P ="(\<lambda>x. f 0 \<le> x)", where Q = "(\<lambda>x. True)", OF sg1]
- \<beta>\<^sub>f_le_\<alpha>\<^sub>f eventually_ge_at_top[of "f 0"]  \<alpha>\<^sub>f_f_exact by simp
+  note sg1 = \<alpha>\<^sub>f_mono[THEN monoD]
+  show ?thesis
+    by (metis eventually_at_top_linorder f_nat_nat.\<alpha>\<^sub>f_f_exact
+          f_nat_nat_axioms filterlim_at_top sg1)  
 qed
-  
+
+
+lemma strict_mono_sequence_partition: 
+  assumes "x \<ge> f 0" 
+  shows "\<exists>k. x \<in> {f k..<f (Suc k)}"
+  using assms \<beta>\<^sub>f_spec_reciprocal_contrapositive f_\<beta>\<^sub>f by auto  
 
 
 end
 end
-
