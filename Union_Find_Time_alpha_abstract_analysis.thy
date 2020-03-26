@@ -2,10 +2,9 @@ theory Union_Find_Time_alpha_abstract_analysis
 
 imports 
   "SepAuto_Time.SepLog_Automatic" 
-  "SeprefTime.Refine_Automation" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
-  SepLogicTime_RBTreeBasic.Asymptotics_1D
+  Imperative_HOL_Time.Asymptotics_1D
   Ackermann
 begin
 

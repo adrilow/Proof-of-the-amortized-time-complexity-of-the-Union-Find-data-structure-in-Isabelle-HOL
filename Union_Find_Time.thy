@@ -4,7 +4,7 @@ imports
   "../Sepreftime/Refine_Imperative_HOL/Sepref_Additional" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
-  "SepLogicTime_RBTreeBasic.Asymptotics_1D"
+  "Imperative_HOL_Time.Asymptotics_1D"
   UnionFind_Impl
 begin
 

@@ -1,6 +1,6 @@
 theory MaxNode_Impl
   imports 
-    Kruskal_Impl "SepLogicTime_RBTreeBasic.MergeSort_Impl"
+    Kruskal_Impl "Imperative_HOL_Time.MergeSort_Impl"
   "SeprefTime.Remdups"
 begin  
 
