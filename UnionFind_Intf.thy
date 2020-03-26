@@ -1,4 +1,4 @@
-theory UnionFind_Impl
+theory UnionFind_Intf
 imports  "SeprefTime.Sepref" UnionFind  
 begin
 

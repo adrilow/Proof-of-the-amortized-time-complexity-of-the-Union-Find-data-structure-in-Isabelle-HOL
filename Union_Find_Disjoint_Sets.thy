@@ -1,12 +1,12 @@
 theory Union_Find_Disjoint_Sets
 imports
   Union_Find_Time_alpha_verification
-  UnionFind_Impl
+  UnionFind_Intf
 begin
 
 thm per_union_impl
              
-interpretation UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
+interpretation UF_alpha: UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
 proof (unfold_locales, goal_cases)
 case (1 t x' x)
   show ?case

@@ -1,5 +1,6 @@
 theory Union_Find_Time_alpha_log_verification
   imports Union_Find_Time_alpha_abstract_analysis Union_Find_Time_alpha
+  UnionFind_Intf
 begin
 
 subsubsection{*uf_init_lemmas*}

@@ -1,6 +1,6 @@
 theory Kruskal_Impl
   imports Kruskal_Refine "SeprefTime.IICF_DArray_List"
-        UnionFind_Impl
+        Union_Find_Disjoint_Sets
 begin
 
 context

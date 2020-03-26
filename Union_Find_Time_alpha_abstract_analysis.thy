@@ -1,7 +1,7 @@
 theory Union_Find_Time_alpha_abstract_analysis
 
 imports 
-  "SepAuto_Time.SepLog_Automatic" 
+  "Imperative_HOL_Time.Sep_Time_Main" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
   Imperative_HOL_Time.Asymptotics_1D

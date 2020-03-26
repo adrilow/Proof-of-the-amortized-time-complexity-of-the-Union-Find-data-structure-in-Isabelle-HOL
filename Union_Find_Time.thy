@@ -1,11 +1,11 @@
 theory Union_Find_Time
 imports 
-  "SepAuto_Time.SepLog_Automatic" 
+  "Imperative_HOL_Time.Sep_Time_Main" 
   "../Sepreftime/Refine_Imperative_HOL/Sepref_Additional" 
   Collections.Partial_Equivalence_Relation
   "HOL-Library.Code_Target_Numeral"
   "Imperative_HOL_Time.Asymptotics_1D"
-  UnionFind_Impl
+  UnionFind_Intf
 begin
 
 notation timeCredit_assn  ("$") 
@@ -1171,7 +1171,7 @@ lemma uf_union_rule: "\<lbrakk>i\<in>Domain R; j\<in> Domain R\<rbrakk>
   unfolding uf_union_time_def using uf_union_rule' by auto
 
 
-interpretation UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
+interpretation UF_log: UnionFind_Impl is_uf uf_init uf_init_time uf_cmp uf_cmp_time uf_union uf_union_time
 proof (unfold_locales, goal_cases)
 case (1 t x' x)
   show ?case
