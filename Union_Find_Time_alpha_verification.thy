@@ -3,6 +3,8 @@ theory Union_Find_Time_alpha_verification
     Union_Find_Time_alpha_abstract_analysis Union_Find_Time_alpha_fix
 begin
 
+no_notation Ref_Time.update ("_ := _" 62)
+
 (* TODO: MOVE *)
 
   lemma per_union_impl: "(i,j)\<in>R \<Longrightarrow> (i,j)\<in>per_union R a b"

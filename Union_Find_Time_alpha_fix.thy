@@ -1,5 +1,7 @@
 theory Union_Find_Time_alpha_fix
-  imports Union_Find_Time_alpha_abstract_analysis
+  imports
+  "Imperative_HOL_Time.Sep_Time_Main"
+ Union_Find_Time_alpha_abstract_analysis
 begin
 
 subsection {* Implementation with Imperative/HOL *}
