@@ -1,5 +1,6 @@
 theory Union_Find_Time_alpha
   imports Union_Find_Time_alpha_abstract_analysis
+  "Imperative_HOL_Time.SLTC_Main"
 begin
 
 subsection {* Implementation with Imperative/HOL *}

@@ -1,6 +1,6 @@
 theory MaxNode_Impl
   imports 
-    Kruskal_Impl "Imperative_HOL_Time.MergeSort_Impl"
+    Kruskal_Impl "Imperative_HOL_Time.IHT_Mergesort"
   "SeprefTime.Remdups"
 begin  
 

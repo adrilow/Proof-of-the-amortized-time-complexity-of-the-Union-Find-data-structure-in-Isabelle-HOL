@@ -1,6 +1,6 @@
 theory Union_Find_Time_alpha_fix
   imports
-  "Imperative_HOL_Time.Sep_Time_Main"
+  "Imperative_HOL_Time.SLTC_Main"
  Union_Find_Time_alpha_abstract_analysis
 begin
 
