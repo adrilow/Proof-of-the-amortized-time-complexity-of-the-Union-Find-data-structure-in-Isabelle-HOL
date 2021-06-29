@@ -4,7 +4,7 @@ For a detailed explanation of the project, as well as the presented theories, se
 
 ## Usage
 
-These theories have been tested with [Isabelle2018], although the use in more recent versions should be possible.
+These theories have been tested with [Isabelle2021], although the use in more recent versions should be possible.
 
 The files InverseNatNat.thy and Ackermann.thy only need a regular Isabelle2018 setup.
 
@@ -35,8 +35,8 @@ These are derived work from the work by M. P.L. Haslbeck and Peter Lammich found
 
 
 
-[Isabelle2018]: https://isabelle.in.tum.de/website-Isabelle2018/index.html
-[Sepreftime]: https://www21.in.tum.de/~haslbema/Sepreftime/
+[Isabelle2021]: https://isabelle.in.tum.de/website-Isabelle2021/index.html
+[Sepreftime]: https://github.com/maxhaslbeck/Sepreftime
 [2-clause-BSD]: https://opensource.org/licenses/BSD-2-Clause
 
 [license-compatible]: https://creativecommons.org/compatiblelicenses
